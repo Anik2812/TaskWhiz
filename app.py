@@ -38,6 +38,20 @@ SCOPES = [
     'https://www.googleapis.com/auth/classroom.coursework.me'
 ]
 
+def refresh_credentials():
+    if 'credentials' not in session:
+        return redirect(url_for('authorize'))
+    credentials = Credentials(**session['credentials'])
+    if credentials.expired and credentials.refresh_token:
+        credentials.refresh(Request())
+        session['credentials'] = credentials_to_dict(credentials)
+    return credentials
+
+@app.before_request
+def before_request():
+    if 'credentials' in session:
+        refresh_credentials()
+
 def send_email(subject, body):
     msg = MIMEText(body)
     msg['Subject'] = subject
@@ -123,6 +137,7 @@ def oauth2callback():
         return redirect(url_for('dashboard'))
     except Exception as e:
         app.logger.error(f"OAuth error: {str(e)}")
+        app.logger.error(f"Full exception: {repr(e)}")
         error_message = f"Authentication failed: {str(e)}"
         return redirect(url_for('error_page', message=error_message))
 
