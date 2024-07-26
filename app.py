@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+import json
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from config import Config
 from github import Github
 from google.oauth2.credentials import Credentials
@@ -11,10 +12,14 @@ import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 import os
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.secret_key = os.urandom(24)  # Ensure the app has a secret key for session management
 
 # GitHub and Google Classroom API clients
 github_client = None
@@ -103,7 +108,8 @@ def get_google_auth_flow():
 @app.route('/authorize')
 def authorize():
     flow = get_google_auth_flow()
-    authorization_url, _ = flow.authorization_url(prompt='consent')
+    authorization_url, state = flow.authorization_url(prompt='consent')
+    session['state'] = state
     return redirect(authorization_url)
 
 @app.route('/oauth2callback')
@@ -111,6 +117,7 @@ def oauth2callback():
     flow = get_google_auth_flow()
     flow.fetch_token(authorization_response=request.url)
     credentials = flow.credentials
+    logging.debug(f"Credentials: {credentials.to_json()}")
     
     global classroom_service
     classroom_service = build('classroom', 'v1', credentials=credentials)
@@ -178,9 +185,9 @@ def dashboard():
                             media_body=media
                         ).execute()
                         
-                        print(f"Submitted assignment: {work['title']}")
+                        logging.debug(f"Submitted assignment: {work['title']}")
             except Exception as e:
-                print(f"Error submitting assignment {work['title']}: {str(e)}")
+                logging.debug(f"Error submitting assignment {work['title']}: {str(e)}")
     
     return "Assignments checked and submitted if applicable."
 
