@@ -125,7 +125,7 @@ def oauth2callback():
         app.logger.error(f"OAuth error: {str(e)}")
         error_message = f"Authentication failed: {str(e)}"
         return redirect(url_for('error_page', message=error_message))
-    
+
 def credentials_to_dict(credentials):
     return {
         'token': credentials.token,
@@ -135,82 +135,132 @@ def credentials_to_dict(credentials):
         'client_secret': credentials.client_secret,
         'scopes': credentials.scopes
     }
-    
-from github import Github
-from googleapiclient.http import MediaIoBaseUpload
-import io
 
 @app.route('/dashboard')
 def dashboard():
     global github_client, classroom_service
+    if 'credentials' not in session:
+        return redirect(url_for('authorize'))
+    
+    credentials = Credentials(**session['credentials'])
+    
     if not github_client:
         github_client = Github(app.config['GITHUB_TOKEN'])
     
     if not classroom_service:
+        classroom_service = build('classroom', 'v1', credentials=credentials)
+    
+    try:
+        repo = github_client.get_repo(app.config['GITHUB_REPO'])
+        courses = classroom_service.courses().list(pageSize=10).execute()
+        assignments = []
+
+        for course in courses.get('courses', []):
+            course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
+            for work in course_work.get('courseWork', []):
+                assignment = {
+                    'title': work['title'],
+                    'course': course['name'],
+                    'due_date': work.get('dueDate', 'No due date'),
+                    'status': 'Not submitted'
+                }
+                
+                # Check if there's a matching folder in the GitHub repo
+                try:
+                    folder_contents = repo.get_contents(work['title'])
+                    if folder_contents:
+                        submission_file = next((file for file in folder_contents if file.name == 'submission.txt'), None)
+                        if submission_file:
+                            assignment['status'] = 'Ready to submit'
+                except:
+                    pass
+                
+                assignments.append(assignment)
+        
+        return render_template('dashboard.html', assignments=assignments)
+    except Exception as e:
+        logging.error(f"Error in dashboard: {str(e)}")
+        return redirect(url_for('error_page', message="Failed to load dashboard"))
+
+@app.route('/submit/<assignment_name>', methods=['POST'])
+def submit_assignment(assignment_name):
+    global github_client, classroom_service
+    if 'credentials' not in session:
         return redirect(url_for('authorize'))
     
-    repo = github_client.get_repo(app.config['GITHUB_REPO'])
+    credentials = Credentials(**session['credentials'])
     
-    # Fetch courses from Google Classroom
-    courses = classroom_service.courses().list(pageSize=10).execute()
+    if not github_client:
+        github_client = Github(app.config['GITHUB_TOKEN'])
     
-    for course in courses.get('courses', []):
-        course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
-        for work in course_work.get('courseWork', []):
-            # Check if there's a matching folder in the GitHub repo
-            try:
-                folder_contents = repo.get_contents(work['title'])
-                if folder_contents:
-                    # Get the submission file
-                    submission_file = next((file for file in folder_contents if file.name == 'submission.txt'), None)
-                    if submission_file:
-                        # Get the file content
-                        file_content = repo.get_contents(submission_file.path).decoded_content
-                        
-                        # Create a media upload object
-                        media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
-                        
-                        # Submit the assignment
-                        student_submission = classroom_service.courses().courseWork().studentSubmissions().list(
-                            courseId=course['id'],
-                            courseWorkId=work['id'],
-                            userId='me'
-                        ).execute().get('studentSubmissions', [])[0]
-                        
-                        classroom_service.courses().courseWork().studentSubmissions().turnIn(
-                            courseId=course['id'],
-                            courseWorkId=work['id'],
-                            id=student_submission['id']
-                        ).execute()
-                        
-                        attachment = classroom_service.courses().courseWork().studentSubmissions().attachments().create(
-                            courseId=course['id'],
-                            courseWorkId=work['id'],
-                            id=student_submission['id'],
-                            body={
-                                'addAttachments': [{
-                                    'driveFile': {
-                                        'title': 'submission.txt'
-                                    }
-                                }]
-                            },
-                            media_body=media
-                        ).execute()
-                        
-                        logging.debug(f"Submitted assignment: {work['title']}")
-            except Exception as e:
-                logging.debug(f"Error submitting assignment {work['title']}: {str(e)}")
-    
-    return "Assignments checked and submitted if applicable."
+    if not classroom_service:
+        classroom_service = build('classroom', 'v1', credentials=credentials)
 
-@app.route('/submit_assignments')
-def submit_assignments():
-    return dashboard()
+    try:
+        repo = github_client.get_repo(app.config['GITHUB_REPO'])
+        file_content = request.files['submission'].read()
+
+        # Create or update the file in GitHub
+        try:
+            contents = repo.get_contents(f"{assignment_name}/submission.txt")
+            repo.update_file(contents.path, f"Update {assignment_name}", file_content, contents.sha)
+        except:
+            repo.create_file(f"{assignment_name}/submission.txt", f"Submit {assignment_name}", file_content)
+
+        # Submit to Google Classroom
+        courses = classroom_service.courses().list(pageSize=10).execute()
+        for course in courses.get('courses', []):
+            course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
+            for work in course_work.get('courseWork', []):
+                if work['title'] == assignment_name:
+                    student_submission = classroom_service.courses().courseWork().studentSubmissions().list(
+                        courseId=course['id'],
+                        courseWorkId=work['id'],
+                        userId='me'
+                    ).execute().get('studentSubmissions', [])[0]
+                    
+                    # Turn in the assignment
+                    classroom_service.courses().courseWork().studentSubmissions().turnIn(
+                        courseId=course['id'],
+                        courseWorkId=work['id'],
+                        id=student_submission['id']
+                    ).execute()
+                    
+                    # Attach the file
+                    media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
+                    attachment = classroom_service.courses().courseWork().studentSubmissions().attachments().create(
+                        courseId=course['id'],
+                        courseWorkId=work['id'],
+                        id=student_submission['id'],
+                        body={
+                            'addAttachments': [{
+                                'driveFile': {
+                                    'title': 'submission.txt'
+                                }
+                            }]
+                        },
+                        media_body=media
+                    ).execute()
+                    
+                    flash(f'Successfully submitted {assignment_name}')
+                    return redirect(url_for('dashboard'))
+
+        flash(f'Could not find assignment {assignment_name} in Google Classroom')
+    except Exception as e:
+        logging.error(f"Error submitting assignment: {str(e)}")
+        flash(f'Error submitting assignment: {str(e)}')
+
+    return redirect(url_for('dashboard'))
 
 @app.route('/error')
 def error_page():
     error_message = request.args.get('message', 'An unknown error occurred.')
     return render_template('error.html', error_message=error_message)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     app.run(debug=True, ssl_context='adhoc')
