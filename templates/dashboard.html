@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1>Your Assignments</h1>
+<div id="assignments">
+    {% for assignment in assignments %}
+    <div class="assignment">
+        <h2>{{ assignment.title }}</h2>
+        <p>Due: {{ assignment.due_date }}</p>
+        <p>Status: {{ assignment.status }}</p>
+        <form action="{{ url_for('submit_assignment', assignment_name=assignment.title) }}" method="post" enctype="multipart/form-data">
+            <input type="file" name="submission" required>
+            <button type="submit">Submit Assignment</button>
+        </form>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -11,6 +11,7 @@ import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 import os
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -87,7 +88,7 @@ def index():
 
 # Google Classroom API setup
 SCOPES = ['https://www.googleapis.com/auth/classroom.courses.readonly',
-          'https://www.googleapis.com/auth/classroom.coursework.me.readonly']
+          'https://www.googleapis.com/auth/classroom.student-submissions.me.readonly']
 
 def get_google_auth_flow():
     flow = Flow.from_client_secrets_file(
@@ -139,12 +140,21 @@ def dashboard():
     for course in courses.get('courses', []):
         course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
         for work in course_work.get('courseWork', []):
+            # Fetch student submission for this course work
+            submissions = classroom_service.courses().courseWork().studentSubmissions().list(
+                courseId=course['id'],
+                courseWorkId=work['id'],
+                userId='me'
+            ).execute()
+            
+            submission = submissions.get('studentSubmissions', [{}])[0]
+            
             assignment = next((a for a in assignments if a['title'] == work['title']), None)
             if assignment:
                 assignment['due_date'] = work.get('dueDate', 'No due date')
-                assignment['status'] = 'Assigned'
+                assignment['status'] = submission.get('state', 'Assigned')
     
     return render_template('dashboard.html', assignments=assignments)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, ssl_context='adhoc')
