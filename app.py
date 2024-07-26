@@ -87,8 +87,11 @@ def index():
     return render_template('index.html')
 
 # Google Classroom API setup
-SCOPES = ['https://www.googleapis.com/auth/classroom.courses.readonly',
-          'https://www.googleapis.com/auth/classroom.student-submissions.me.readonly']
+SCOPES = [
+    'https://www.googleapis.com/auth/classroom.courses.readonly',
+    'https://www.googleapis.com/auth/classroom.coursework.students',
+    'https://www.googleapis.com/auth/classroom.coursework.me'
+]
 
 def get_google_auth_flow():
     flow = Flow.from_client_secrets_file(
@@ -114,6 +117,10 @@ def oauth2callback():
     
     return redirect(url_for('dashboard'))
 
+from github import Github
+from googleapiclient.http import MediaIoBaseUpload
+import io
+
 @app.route('/dashboard')
 def dashboard():
     global github_client, classroom_service
@@ -124,37 +131,62 @@ def dashboard():
         return redirect(url_for('authorize'))
     
     repo = github_client.get_repo(app.config['GITHUB_REPO'])
-    assignments = []
     
-    # Fetch assignments from GitHub
-    for content in repo.get_contents(""):
-        if content.type == "dir":
-            assignments.append({
-                'title': content.name,
-                'due_date': 'Unknown',
-                'status': 'Pending'
-            })
-    
-    # Fetch courses and assignments from Google Classroom
+    # Fetch courses from Google Classroom
     courses = classroom_service.courses().list(pageSize=10).execute()
+    
     for course in courses.get('courses', []):
         course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
         for work in course_work.get('courseWork', []):
-            # Fetch student submission for this course work
-            submissions = classroom_service.courses().courseWork().studentSubmissions().list(
-                courseId=course['id'],
-                courseWorkId=work['id'],
-                userId='me'
-            ).execute()
-            
-            submission = submissions.get('studentSubmissions', [{}])[0]
-            
-            assignment = next((a for a in assignments if a['title'] == work['title']), None)
-            if assignment:
-                assignment['due_date'] = work.get('dueDate', 'No due date')
-                assignment['status'] = submission.get('state', 'Assigned')
+            # Check if there's a matching folder in the GitHub repo
+            try:
+                folder_contents = repo.get_contents(work['title'])
+                if folder_contents:
+                    # Get the submission file
+                    submission_file = next((file for file in folder_contents if file.name == 'submission.txt'), None)
+                    if submission_file:
+                        # Get the file content
+                        file_content = repo.get_contents(submission_file.path).decoded_content
+                        
+                        # Create a media upload object
+                        media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
+                        
+                        # Submit the assignment
+                        student_submission = classroom_service.courses().courseWork().studentSubmissions().list(
+                            courseId=course['id'],
+                            courseWorkId=work['id'],
+                            userId='me'
+                        ).execute().get('studentSubmissions', [])[0]
+                        
+                        classroom_service.courses().courseWork().studentSubmissions().turnIn(
+                            courseId=course['id'],
+                            courseWorkId=work['id'],
+                            id=student_submission['id']
+                        ).execute()
+                        
+                        attachment = classroom_service.courses().courseWork().studentSubmissions().attachments().create(
+                            courseId=course['id'],
+                            courseWorkId=work['id'],
+                            id=student_submission['id'],
+                            body={
+                                'addAttachments': [{
+                                    'driveFile': {
+                                        'title': 'submission.txt'
+                                    }
+                                }]
+                            },
+                            media_body=media
+                        ).execute()
+                        
+                        print(f"Submitted assignment: {work['title']}")
+            except Exception as e:
+                print(f"Error submitting assignment {work['title']}: {str(e)}")
     
-    return render_template('dashboard.html', assignments=assignments)
+    return "Assignments checked and submitted if applicable."
+
+@app.route('/submit_assignments')
+def submit_assignments():
+    return dashboard()
 
 if __name__ == '__main__':
     app.run(debug=True, ssl_context='adhoc')
