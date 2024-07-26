@@ -3,7 +3,26 @@
 {% block title %}Welcome{% endblock %}
 
 {% block content %}
-<h1>Welcome to TaskWhiz</h1>
-<p>Manage your college assignments with ease!</p>
-<a href="{{ url_for('dashboard') }}" class="btn">Go to Dashboard</a>
+<div class="hero fade-in">
+    <h1>Welcome to TaskWhiz</h1>
+    <p>Manage your college assignments with ease!</p>
+    <a href="{{ url_for('dashboard') }}" class="btn"><i class="fas fa-arrow-right"></i> Go to Dashboard</a>
+</div>
+<div class="features">
+    <div class="feature fade-in">
+        <i class="fas fa-sync-alt"></i>
+        <h2>GitHub Integration</h2>
+        <p>Seamlessly sync your assignments with GitHub repositories.</p>
+    </div>
+    <div class="feature fade-in">
+        <i class="fas fa-graduation-cap"></i>
+        <h2>Google Classroom</h2>
+        <p>Connect with Google Classroom to import your assignments and due dates.</p>
+    </div>
+    <div class="feature fade-in">
+        <i class="fas fa-bell"></i>
+        <h2>Smart Notifications</h2>
+        <p>Receive timely reminders for upcoming assignments and deadlines.</p>
+    </div>
+</div>
 {% endblock %}

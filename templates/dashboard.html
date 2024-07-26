@@ -3,18 +3,24 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<h1>Your Assignments</h1>
-<div id="assignments">
+<h1 class="fade-in">Your Assignments</h1>
+<div id="assignments" class="fade-in">
     {% for assignment in assignments %}
-    <div class="assignment">
+    <div class="assignment" data-id="{{ assignment.id }}">
         <h2>{{ assignment.title }}</h2>
-        <p>Due: {{ assignment.due_date }}</p>
-        <p>Status: {{ assignment.status }}</p>
-        <form action="{{ url_for('submit_assignment', assignment_name=assignment.title) }}" method="post" enctype="multipart/form-data">
-            <input type="file" name="submission" required>
-            <button type="submit">Submit Assignment</button>
-        </form>
+        <p class="assignment-due-date"><i class="far fa-clock"></i> Due: {{ assignment.due_date }}</p>
+        <p class="assignment-status status-{{ assignment.status.lower() }}">{{ assignment.status }}</p>
+        <div class="file-upload">
+            <label for="file-{{ assignment.id }}">
+                <i class="fas fa-upload"></i> Choose File
+            </label>
+            <input type="file" id="file-{{ assignment.id }}" class="file-input" data-assignment-id="{{ assignment.id }}">
+        </div>
+        <button class="submit-btn" data-assignment-id="{{ assignment.id }}">Submit Assignment</button>
     </div>
     {% endfor %}
+</div>
+<div id="loading" class="loading-spinner" style="display: none;">
+    <i class="fas fa-spinner fa-spin"></i> Loading...
 </div>
 {% endblock %}
