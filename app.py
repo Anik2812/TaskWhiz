@@ -94,39 +94,48 @@ def check_and_submit_assignments():
         logger.error(f"Error in check_and_submit_assignments: {str(e)}")
 
 def submit_assignment(course_id, course_work_id, assignment_name, file_content):
-    student_submission = classroom_service.courses().courseWork().studentSubmissions().list(
-        courseId=course_id,
-        courseWorkId=course_work_id,
-        userId='me'
-    ).execute().get('studentSubmissions', [])[0]
+    try:
+        student_submissions = classroom_service.courses().courseWork().studentSubmissions().list(
+            courseId=course_id,
+            courseWorkId=course_work_id,
+            userId='me'
+        ).execute().get('studentSubmissions', [])
+        
+        if not student_submissions:
+            logger.warning(f"No submissions found for course ID {course_id} and coursework ID {course_work_id}")
+            return
 
-    # Turn in the assignment
-    classroom_service.courses().courseWork().studentSubmissions().turnIn(
-        courseId=course_id,
-        courseWorkId=course_work_id,
-        id=student_submission['id']
-    ).execute()
+        student_submission = student_submissions[0]
 
-    # Attach the file
-    media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
-    classroom_service.courses().courseWork().studentSubmissions().attachments().create(
-        courseId=course_id,
-        courseWorkId=course_work_id,
-        id=student_submission['id'],
-        body={
-            'addAttachments': [{
-                'driveFile': {
-                    'title': 'submission.txt'
-                }
-            }]
-        },
-        media_body=media
-    ).execute()
+        # Turn in the assignment
+        classroom_service.courses().courseWork().studentSubmissions().turnIn(
+            courseId=course_id,
+            courseWorkId=course_work_id,
+            id=student_submission['id']
+        ).execute()
 
-    send_email(
-        f"Assignment Submitted: {assignment_name}",
-        f"Your assignment '{assignment_name}' has been automatically submitted to Google Classroom."
-    )
+        # Attach the file
+        media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
+        classroom_service.courses().courseWork().studentSubmissions().attachments().create(
+            courseId=course_id,
+            courseWorkId=course_work_id,
+            id=student_submission['id'],
+            body={
+                'addAttachments': [{
+                    'driveFile': {
+                        'title': 'submission.txt'
+                    }
+                }]
+            },
+            media_body=media
+        ).execute()
+
+        send_email(
+            f"Assignment Submitted: {assignment_name}",
+            f"Your assignment '{assignment_name}' has been automatically submitted to Google Classroom."
+        )
+    except Exception as e:
+        logger.error(f"Error submitting assignment: {str(e)}")
 
 def run_scheduler():
     while True:
@@ -238,4 +247,4 @@ def logout():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    app.run(debug=False, ssl_context='adhoc')
+    app.run(debug=True, ssl_context='adhoc')
