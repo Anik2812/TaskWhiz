@@ -6,16 +6,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingSpinner = document.getElementById('loading');
 
     // Theme toggle functionality
-    themeToggle.addEventListener('click', function(e) {
-        e.preventDefault();
-        document.body.classList.toggle('dark-theme');
-        const icon = this.querySelector('i');
-        if (icon.classList.contains('fa-moon')) {
-            icon.classList.replace('fa-moon', 'fa-sun');
-        } else {
-            icon.classList.replace('fa-sun', 'fa-moon');
-        }
-    });
+    if (themeToggle) {
+        themeToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.body.classList.toggle('dark-theme');
+            const icon = this.querySelector('i');
+            if (icon.classList.contains('fa-moon')) {
+                icon.classList.replace('fa-moon', 'fa-sun');
+            } else {
+                icon.classList.replace('fa-sun', 'fa-moon');
+            }
+        });
+    }
 
     // Assignment card hover effect
     assignmentCards.forEach(card => {
@@ -35,8 +37,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const fileName = e.target.files[0].name;
             const assignmentId = this.dataset.assignmentId;
             const label = document.querySelector(`label[for="file-${assignmentId}"]`);
-            label.innerHTML = `<i class="fas fa-file"></i> ${fileName}`;
-            label.classList.add('file-selected');
+            if (label) {
+                label.innerHTML = `<i class="fas fa-file"></i> ${fileName}`;
+                label.classList.add('file-selected');
+            }
         });
     });
 
@@ -46,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const assignmentId = this.dataset.assignmentId;
             const fileInput = document.getElementById(`file-${assignmentId}`);
            
-            if (fileInput.files.length === 0) {
+            if (!fileInput || fileInput.files.length === 0) {
                 showNotification('Please select a file to upload.', 'error');
                 return;
             }
@@ -54,7 +58,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
 
-            loadingSpinner.style.display = 'block';
+            if (loadingSpinner) {
+                loadingSpinner.style.display = 'block';
+            }
 
             fetch(`/submit/${assignmentId}`, {
                 method: 'POST',
@@ -62,7 +68,9 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => response.json())
             .then(data => {
-                loadingSpinner.style.display = 'none';
+                if (loadingSpinner) {
+                    loadingSpinner.style.display = 'none';
+                }
                 if (data.success) {
                     showNotification('Assignment submitted successfully!', 'success');
                     updateAssignmentStatus(assignmentId, 'Submitted');
@@ -71,7 +79,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
-                loadingSpinner.style.display = 'none';
+                if (loadingSpinner) {
+                    loadingSpinner.style.display = 'none';
+                }
                 console.error('Error:', error);
                 showNotification('An error occurred. Please try again.', 'error');
             });
@@ -80,8 +90,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateAssignmentStatus(assignmentId, status) {
         const statusElement = document.querySelector(`.assignment[data-id="${assignmentId}"] .assignment-status`);
-        statusElement.textContent = status;
-        statusElement.className = `assignment-status status-${status.toLowerCase().replace(' ', '-')}`;
+        if (statusElement) {
+            statusElement.textContent = status;
+            statusElement.className = `assignment-status status-${status.toLowerCase().replace(' ', '-')}`;
+        }
     }
 
     function showNotification(message, type) {
@@ -100,13 +112,4 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    // Add smooth scrolling to all links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            document.querySelector(this.getAttribute('href')).scrollIntoView({
-                behavior: 'smooth'
-            });
-        });
-    });
 });

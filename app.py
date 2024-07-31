@@ -276,12 +276,76 @@ def submit_assignment_manually(assignment_id):
     file = request.files['file']
     if file.filename == '':
         return jsonify({'success': False, 'message': 'No selected file'})
+    
     try:
         file_content = file.read()
+        course_id = None
+        course_work_id = None
+        
+        # Find the correct course and coursework IDs
+        courses = classroom_service.courses().list(pageSize=10).execute()
+        for course in courses.get('courses', []):
+            course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
+            for work in course_work.get('courseWork', []):
+                if work['id'] == assignment_id:
+                    course_id = course['id']
+                    course_work_id = work['id']
+                    break
+            if course_id:
+                break
+        
+        if not course_id or not course_work_id:
+            return jsonify({'success': False, 'message': 'Assignment not found'})
+        
+        # Submit the assignment
+        submit_assignment(course_id, course_work_id, file.filename, file_content)
+        
         return jsonify({'success': True, 'message': 'Assignment submitted successfully'})
     except Exception as e:
         logger.error(f"Error submitting assignment manually: {str(e)}")
         return jsonify({'success': False, 'message': 'Error submitting assignment'})
+
+def submit_assignment(course_id, course_work_id, filename, file_content):
+    try:
+        student_submissions = classroom_service.courses().courseWork().studentSubmissions().list(
+            courseId=course_id,
+            courseWorkId=course_work_id,
+            userId='me'
+        ).execute().get('studentSubmissions', [])
+        
+        if not student_submissions:
+            logger.warning(f"No submissions found for course ID {course_id} and coursework ID {course_work_id}")
+            return
+
+        student_submission = student_submissions[0]
+
+        # Attach the file
+        media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
+        classroom_service.courses().courseWork().studentSubmissions().modifyAttachments(
+            courseId=course_id,
+            courseWorkId=course_work_id,
+            id=student_submission['id'],
+            body={
+                'addAttachments': [{
+                    'driveFile': {
+                        'id': 'your_drive_file_id'  # Use the correct file ID here
+                    }
+                }]
+            }
+        ).execute()
+
+        # Turn in the assignment
+        classroom_service.courses().courseWork().studentSubmissions().turnIn(
+            courseId=course_id,
+            courseWorkId=course_work_id,
+            id=student_submission['id']
+        ).execute()
+
+        logger.info(f"Successfully submitted assignment: {filename}")
+    except Exception as e:
+        logger.error(f"Error submitting assignment: {str(e)}")
+        raise
+
 
 if __name__ == '__main__':
     app.run(debug=True, ssl_context='adhoc')
