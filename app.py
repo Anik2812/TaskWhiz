@@ -17,22 +17,18 @@ import schedule
 import smtplib
 from email.mime.text import MIMEText
 
-# Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Load configuration
 from config import Config
 
 app = Flask(__name__)
 app.config.from_object(Config)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
 
-# GitHub and Google Classroom API clients
 github_client = None
 classroom_service = None
 
-# Google Classroom API setup
 SCOPES = [
     'https://www.googleapis.com/auth/classroom.student-submissions.me.readonly',
     'https://www.googleapis.com/auth/classroom.courses.readonly',
@@ -84,14 +80,21 @@ def check_and_submit_assignments():
         for course in courses.get('courses', []):
             course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
             for work in course_work.get('courseWork', []):
-                try:
-                    file_content = repo.get_contents(f"{work['title']}/submission.txt").decoded_content
-                    submit_assignment(course['id'], work['id'], work['title'], file_content)
-                    logger.info(f"Submitted assignment: {work['title']}")
-                except Exception as e:
-                    logger.error(f"Error submitting assignment {work['title']}: {str(e)}")
+                due_date = parse_due_date(work.get('dueDate', {}))
+                if due_date and (due_date - datetime.now()).days <= 1:
+                    try:
+                        file_content = repo.get_contents(f"{work['title']}/submission.txt").decoded_content
+                        submit_assignment(course['id'], work['id'], work['title'], file_content)
+                        logger.info(f"Submitted assignment: {work['title']}")
+                    except Exception as e:
+                        logger.error(f"Error submitting assignment {work['title']}: {str(e)}")
     except Exception as e:
         logger.error(f"Error in check_and_submit_assignments: {str(e)}")
+
+def parse_due_date(due_date):
+    if not due_date:
+        return None
+    return datetime(year=due_date.get('year', 1), month=due_date.get('month', 1), day=due_date.get('day', 1))
 
 def submit_assignment(course_id, course_work_id, assignment_name, file_content):
     try:
@@ -107,14 +110,12 @@ def submit_assignment(course_id, course_work_id, assignment_name, file_content):
 
         student_submission = student_submissions[0]
 
-        # Turn in the assignment
         classroom_service.courses().courseWork().studentSubmissions().turnIn(
             courseId=course_id,
             courseWorkId=course_work_id,
             id=student_submission['id']
         ).execute()
 
-        # Attach the file
         media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
         classroom_service.courses().courseWork().studentSubmissions().attachments().create(
             courseId=course_id,
@@ -216,10 +217,12 @@ def dashboard():
         for course in courses.get('courses', []):
             course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
             for work in course_work.get('courseWork', []):
+                due_date = parse_due_date(work.get('dueDate', {}))
                 assignment = {
+                    'id': work['id'],
                     'title': work['title'],
                     'course': course['name'],
-                    'due_date': work.get('dueDate', 'No due date'),
+                    'due_date': due_date.strftime('%Y-%m-%d') if due_date else 'No due date',
                     'status': 'Not submitted'
                 }
                 
@@ -245,6 +248,20 @@ def error_page():
 def logout():
     session.clear()
     return redirect(url_for('index'))
+
+@app.route('/submit/<assignment_id>', methods=['POST'])
+def submit_assignment_manually(assignment_id):
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': 'No file part'})
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'message': 'No selected file'})
+    try:
+        file_content = file.read()
+        return jsonify({'success': True, 'message': 'Assignment submitted successfully'})
+    except Exception as e:
+        logger.error(f"Error submitting assignment manually: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error submitting assignment'})
 
 if __name__ == '__main__':
     app.run(debug=True, ssl_context='adhoc')

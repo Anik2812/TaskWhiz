@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             const assignmentId = this.dataset.assignmentId;
             const fileInput = document.getElementById(`file-${assignmentId}`);
-            
+           
             if (fileInput.files.length === 0) {
                 alert('Please select a file to upload.');
                 return;

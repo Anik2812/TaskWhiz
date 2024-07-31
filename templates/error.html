@@ -1,65 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Error - TaskWhiz{% endblock %}
+{% block title %}Error{% endblock %}
 
 {% block content %}
-<div class="error-container">
-    <div class="error-content">
-        <h1 class="error-title">Oops! An Error Occurred</h1>
-        <div class="error-icon">
-            <i class="fas fa-exclamation-triangle"></i>
-        </div>
-        <p class="error-message">{{ error_message }}</p>
-        <a href="{{ url_for('index') }}" class="btn btn-primary">Return to Home</a>
-    </div>
+<div class="error-container fade-in">
+    <h1>Oops! Something went wrong</h1>
+    <p>{{ error_message }}</p>
+    <a href="{{ url_for('index') }}" class="btn"><i class="fas fa-home"></i> Back to Home</a>
 </div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .error-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: calc(100vh - 100px);
-    }
-    .error-content {
-        text-align: center;
-        background-color: #ffffff;
-        border-radius: 8px;
-        padding: 2rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        max-width: 500px;
-        width: 90%;
-    }
-    .error-title {
-        color: #e74c3c;
-        font-size: 2rem;
-        margin-bottom: 1rem;
-    }
-    .error-icon {
-        font-size: 4rem;
-        color: #e74c3c;
-        margin-bottom: 1rem;
-    }
-    .error-message {
-        font-size: 1.1rem;
-        color: #34495e;
-        margin-bottom: 2rem;
-    }
-    .btn-primary {
-        background-color: #3498db;
-        border-color: #3498db;
-        color: #ffffff;
-        padding: 0.5rem 1rem;
-        font-size: 1rem;
-        text-decoration: none;
-        border-radius: 4px;
-        transition: background-color 0.3s ease;
-    }
-    .btn-primary:hover {
-        background-color: #2980b9;
-        border-color: #2980b9;
-    }
-</style>
 {% endblock %}
