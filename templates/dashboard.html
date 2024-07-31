@@ -12,6 +12,7 @@
             <p class="assignment-course"><i class="fas fa-chalkboard-teacher"></i> {{ assignment.course }}</p>
             <p class="assignment-due-date"><i class="far fa-clock"></i> Due: {{ assignment.due_date }}</p>
             <p class="assignment-status status-{{ assignment.status.lower().replace(' ', '-') }}">{{ assignment.status }}</p>
+            {% if assignment.status != 'Submitted' %}
             <div class="file-upload">
                 <label for="file-{{ assignment.id }}">
                     <i class="fas fa-upload"></i> Choose File
@@ -19,6 +20,7 @@
                 <input type="file" id="file-{{ assignment.id }}" class="file-input" data-assignment-id="{{ assignment.id }}">
             </div>
             <button class="submit-btn" data-assignment-id="{{ assignment.id }}">Submit Assignment</button>
+            {% endif %}
         </div>
         {% endfor %}
     </div>

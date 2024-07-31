@@ -20,10 +20,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Assignment card hover effect
     assignmentCards.forEach(card => {
         card.addEventListener('mouseenter', function() {
-            this.style.transform = 'scale(1.03)';
+            this.style.transform = 'scale(1.05)';
+            this.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.2)';
         });
         card.addEventListener('mouseleave', function() {
             this.style.transform = 'scale(1)';
+            this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
         });
     });
 
@@ -34,6 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const assignmentId = this.dataset.assignmentId;
             const label = document.querySelector(`label[for="file-${assignmentId}"]`);
             label.innerHTML = `<i class="fas fa-file"></i> ${fileName}`;
+            label.classList.add('file-selected');
         });
     });
 
@@ -44,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const fileInput = document.getElementById(`file-${assignmentId}`);
            
             if (fileInput.files.length === 0) {
-                alert('Please select a file to upload.');
+                showNotification('Please select a file to upload.', 'error');
                 return;
             }
 
@@ -61,16 +64,16 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 loadingSpinner.style.display = 'none';
                 if (data.success) {
-                    alert('Assignment submitted successfully!');
-                    updateAssignmentStatus(assignmentId, 'Completed');
+                    showNotification('Assignment submitted successfully!', 'success');
+                    updateAssignmentStatus(assignmentId, 'Submitted');
                 } else {
-                    alert('Error submitting assignment. Please try again.');
+                    showNotification('Error submitting assignment. Please try again.', 'error');
                 }
             })
             .catch(error => {
                 loadingSpinner.style.display = 'none';
                 console.error('Error:', error);
-                alert('An error occurred. Please try again.');
+                showNotification('An error occurred. Please try again.', 'error');
             });
         });
     });
@@ -78,7 +81,23 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateAssignmentStatus(assignmentId, status) {
         const statusElement = document.querySelector(`.assignment[data-id="${assignmentId}"] .assignment-status`);
         statusElement.textContent = status;
-        statusElement.className = `assignment-status status-${status.toLowerCase()}`;
+        statusElement.className = `assignment-status status-${status.toLowerCase().replace(' ', '-')}`;
+    }
+
+    function showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }, 3000);
     }
 
     // Add smooth scrolling to all links

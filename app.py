@@ -7,7 +7,7 @@ import time
 from datetime import datetime, timedelta
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
-from github import Github
+from github import Github, GithubException
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import Flow
@@ -16,6 +16,7 @@ from googleapiclient.http import MediaIoBaseUpload
 import schedule
 import smtplib
 from email.mime.text import MIMEText
+from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -83,11 +84,12 @@ def check_and_submit_assignments():
                 due_date = parse_due_date(work.get('dueDate', {}))
                 if due_date and (due_date - datetime.now()).days <= 1:
                     try:
-                        file_content = repo.get_contents(f"{work['title']}/submission.txt").decoded_content
+                        file_path = f"{work['title']}/submission.txt"
+                        file_content = repo.get_contents(file_path).decoded_content
                         submit_assignment(course['id'], work['id'], work['title'], file_content)
-                        logger.info(f"Submitted assignment: {work['title']}")
-                    except Exception as e:
-                        logger.error(f"Error submitting assignment {work['title']}: {str(e)}")
+                        logger.info(f"Automatically submitted assignment: {work['title']}")
+                    except GithubException:
+                        logger.warning(f"No submission file found for {work['title']}")
     except Exception as e:
         logger.error(f"Error in check_and_submit_assignments: {str(e)}")
 
@@ -110,12 +112,19 @@ def submit_assignment(course_id, course_work_id, assignment_name, file_content):
 
         student_submission = student_submissions[0]
 
+        # Check if the assignment is already submitted
+        if student_submission['state'] == 'TURNED_IN':
+            logger.info(f"Assignment '{assignment_name}' is already submitted.")
+            return
+
+        # Turn in the assignment
         classroom_service.courses().courseWork().studentSubmissions().turnIn(
             courseId=course_id,
             courseWorkId=course_work_id,
             id=student_submission['id']
         ).execute()
 
+        # Attach the file
         media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
         classroom_service.courses().courseWork().studentSubmissions().attachments().create(
             courseId=course_id,
@@ -135,6 +144,7 @@ def submit_assignment(course_id, course_work_id, assignment_name, file_content):
             f"Assignment Submitted: {assignment_name}",
             f"Your assignment '{assignment_name}' has been automatically submitted to Google Classroom."
         )
+        logger.info(f"Successfully submitted assignment: {assignment_name}")
     except Exception as e:
         logger.error(f"Error submitting assignment: {str(e)}")
 
@@ -226,11 +236,21 @@ def dashboard():
                     'status': 'Not submitted'
                 }
                 
-                try:
-                    repo.get_contents(f"{work['title']}/submission.txt")
-                    assignment['status'] = 'Ready to submit'
-                except:
-                    pass
+                # Check submission status
+                submissions = classroom_service.courses().courseWork().studentSubmissions().list(
+                    courseId=course['id'],
+                    courseWorkId=work['id'],
+                    userId='me'
+                ).execute().get('studentSubmissions', [])
+                
+                if submissions and submissions[0]['state'] == 'TURNED_IN':
+                    assignment['status'] = 'Submitted'
+                else:
+                    try:
+                        repo.get_contents(f"{work['title']}/submission.txt")
+                        assignment['status'] = 'Ready to submit'
+                    except GithubException:
+                        pass
                 
                 assignments.append(assignment)
         
@@ -238,7 +258,7 @@ def dashboard():
     except Exception as e:
         logger.error(f"Error in dashboard: {str(e)}")
         return redirect(url_for('error_page', message="Failed to load dashboard"))
-
+    
 @app.route('/error')
 def error_page():
     error_message = request.args.get('message', 'An unknown error occurred.')
