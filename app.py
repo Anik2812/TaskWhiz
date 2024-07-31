@@ -18,6 +18,7 @@ import schedule
 import smtplib
 from email.mime.text import MIMEText
 import requests
+from werkzeug.utils import secure_filename
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -39,7 +40,9 @@ SCOPES = [
     'https://www.googleapis.com/auth/classroom.rosters.readonly',
     'https://www.googleapis.com/auth/classroom.student-submissions.me.readonly',
     'https://www.googleapis.com/auth/classroom.student-submissions.students.readonly',
-    'https://www.googleapis.com/auth/drive.file'
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/userinfo.email'
 ]
 
 def refresh_credentials():
@@ -75,9 +78,9 @@ def send_email(subject, body):
         logger.error(f"Failed to send email: {str(e)}")
 
 def check_and_submit_assignments():
-    global github_client, classroom_service
-    if not github_client or not classroom_service:
-        logger.warning("GitHub or Classroom client not initialized")
+    global github_client, classroom_service, drive_service
+    if not github_client or not classroom_service or not drive_service:
+        logger.warning("GitHub, Classroom, or Drive client not initialized")
         return
 
     try:
@@ -278,7 +281,7 @@ def dashboard():
     except Exception as e:
         logger.error(f"Error in dashboard: {str(e)}")
         return redirect(url_for('error_page', message="Failed to load dashboard"))
-    
+
 @app.route('/error')
 def error_page():
     error_message = request.args.get('message', 'An unknown error occurred.')
@@ -318,7 +321,7 @@ def submit_assignment_manually(assignment_id):
             return jsonify({'success': False, 'message': 'Assignment not found'})
         
         # Submit the assignment
-        submit_assignment(course_id, course_work_id, file.filename, file_content)
+        submit_assignment(course_id, course_work_id, secure_filename(file.filename), file_content)
         
         return jsonify({'success': True, 'message': 'Assignment submitted successfully'})
     except HttpError as e:
@@ -340,6 +343,86 @@ def revoke():
         if status_code == 200:
             return redirect(url_for('authorize'))
     return redirect(url_for('index'))
+
+@app.route('/assignments')
+def assignments():
+    credentials = refresh_credentials()
+    if not credentials:
+        return redirect(url_for('authorize'))
+    
+    if not classroom_service:
+        classroom_service = build('classroom', 'v1', credentials=credentials)
+    
+    try:
+        courses = classroom_service.courses().list(pageSize=10).execute()
+        all_assignments = []
+
+        for course in courses.get('courses', []):
+            course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
+            for work in course_work.get('courseWork', []):
+                due_date = parse_due_date(work.get('dueDate', {}))
+                assignment = {
+                    'id': work['id'],
+                    'title': work['title'],
+                    'course': course['name'],
+                    'due_date': due_date.strftime('%Y-%m-%d') if due_date else 'No due date',
+                    'description': work.get('description', 'No description available')
+                }
+                all_assignments.append(assignment)
+        
+        return render_template('assignments.html', assignments=all_assignments)
+    except Exception as e:
+        logger.error(f"Error fetching assignments: {str(e)}")
+        return redirect(url_for('error_page', message="Failed to load assignments"))
+
+@app.route('/courses')
+def courses():
+    credentials = refresh_credentials()
+    if not credentials:
+        return redirect(url_for('authorize'))
+    
+    if not classroom_service:
+        classroom_service = build('classroom', 'v1', credentials=credentials)
+    
+    try:
+        courses = classroom_service.courses().list(pageSize=10).execute()
+        return render_template('courses.html', courses=courses.get('courses', []))
+    except Exception as e:
+        logger.error(f"Error fetching courses: {str(e)}")
+        return redirect(url_for('error_page', message="Failed to load courses"))
+
+@app.route('/profile')
+def profile():
+    credentials = refresh_credentials()
+    if not credentials:
+        return redirect(url_for('authorize'))
+    
+    try:
+        user_info_service = build('oauth2', 'v2', credentials=credentials)
+        user_info = user_info_service.userinfo().get().execute()
+        return render_template('profile.html', user_info=user_info)
+    except Exception as e:
+        logger.error(f"Error fetching user profile: {str(e)}")
+        return redirect(url_for('error_page', message="Failed to load user profile"))
+
+@app.route('/settings')
+def settings():
+    return render_template('settings.html')
+
+@app.route('/update_settings', methods=['POST'])
+def update_settings():
+    # Here you can add logic to update user settings
+    # For example, updating email preferences, GitHub token, etc.
+    flash('Settings updated successfully', 'success')
+    return redirect(url_for('settings'))
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template('500.html'), 500
 
 if __name__ == '__main__':
     app.run(debug=True, ssl_context='adhoc')
