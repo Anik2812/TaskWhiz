@@ -13,10 +13,11 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.errors import HttpError
 import schedule
 import smtplib
 from email.mime.text import MIMEText
-from datetime import datetime, timedelta
+import requests
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -29,11 +30,16 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
 
 github_client = None
 classroom_service = None
+drive_service = None
 
 SCOPES = [
-    'https://www.googleapis.com/auth/classroom.student-submissions.me.readonly',
     'https://www.googleapis.com/auth/classroom.courses.readonly',
-    'https://www.googleapis.com/auth/classroom.coursework.me'
+    'https://www.googleapis.com/auth/classroom.coursework.me',
+    'https://www.googleapis.com/auth/classroom.coursework.students',
+    'https://www.googleapis.com/auth/classroom.rosters.readonly',
+    'https://www.googleapis.com/auth/classroom.student-submissions.me.readonly',
+    'https://www.googleapis.com/auth/classroom.student-submissions.students.readonly',
+    'https://www.googleapis.com/auth/drive.file'
 ]
 
 def refresh_credentials():
@@ -98,7 +104,7 @@ def parse_due_date(due_date):
         return None
     return datetime(year=due_date.get('year', 1), month=due_date.get('month', 1), day=due_date.get('day', 1))
 
-def submit_assignment(course_id, course_work_id, assignment_name, file_content):
+def submit_assignment(course_id, course_work_id, filename, file_content):
     try:
         student_submissions = classroom_service.courses().courseWork().studentSubmissions().list(
             courseId=course_id,
@@ -112,10 +118,24 @@ def submit_assignment(course_id, course_work_id, assignment_name, file_content):
 
         student_submission = student_submissions[0]
 
-        # Check if the assignment is already submitted
-        if student_submission['state'] == 'TURNED_IN':
-            logger.info(f"Assignment '{assignment_name}' is already submitted.")
-            return
+        # Create a new file in Google Drive
+        file_metadata = {'name': filename}
+        media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
+        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+
+        # Attach the file
+        attachment = classroom_service.courses().courseWork().studentSubmissions().modifyAttachments(
+            courseId=course_id,
+            courseWorkId=course_work_id,
+            id=student_submission['id'],
+            body={
+                'addAttachments': [{
+                    'driveFile': {
+                        'id': file.get('id')
+                    }
+                }]
+            }
+        ).execute()
 
         # Turn in the assignment
         classroom_service.courses().courseWork().studentSubmissions().turnIn(
@@ -124,29 +144,14 @@ def submit_assignment(course_id, course_work_id, assignment_name, file_content):
             id=student_submission['id']
         ).execute()
 
-        # Attach the file
-        media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
-        classroom_service.courses().courseWork().studentSubmissions().attachments().create(
-            courseId=course_id,
-            courseWorkId=course_work_id,
-            id=student_submission['id'],
-            body={
-                'addAttachments': [{
-                    'driveFile': {
-                        'title': 'submission.txt'
-                    }
-                }]
-            },
-            media_body=media
-        ).execute()
-
-        send_email(
-            f"Assignment Submitted: {assignment_name}",
-            f"Your assignment '{assignment_name}' has been automatically submitted to Google Classroom."
-        )
-        logger.info(f"Successfully submitted assignment: {assignment_name}")
+        logger.info(f"Successfully submitted assignment: {filename}")
+    except HttpError as e:
+        error_details = json.loads(e.content.decode('utf-8'))
+        logger.error(f"HTTP Error {e.resp.status}: {error_details['error']['message']}")
+        raise
     except Exception as e:
         logger.error(f"Error submitting assignment: {str(e)}")
+        raise
 
 def run_scheduler():
     while True:
@@ -170,6 +175,20 @@ def get_google_auth_flow():
 def index():
     return render_template('index.html')
 
+@app.route('/check_auth')
+def check_auth():
+    if 'credentials' not in session:
+        return jsonify({'status': 'Not authenticated'})
+    credentials = Credentials(**session['credentials'])
+    if credentials.expired:
+        return jsonify({'status': 'Credentials expired'})
+    return jsonify({
+        'status': 'Authenticated',
+        'token': credentials.token,
+        'refresh_token': credentials.refresh_token,
+        'scopes': credentials.scopes
+    })
+
 @app.route('/authorize')
 def authorize():
     flow = get_google_auth_flow()
@@ -185,8 +204,9 @@ def oauth2callback():
         credentials = flow.credentials
         logger.info(f"Successfully obtained credentials: {credentials.to_json()}")
         
-        global classroom_service
+        global classroom_service, drive_service
         classroom_service = build('classroom', 'v1', credentials=credentials)
+        drive_service = build('drive', 'v3', credentials=credentials)
         
         session['credentials'] = credentials_to_dict(credentials)
         return redirect(url_for('dashboard'))
@@ -301,51 +321,25 @@ def submit_assignment_manually(assignment_id):
         submit_assignment(course_id, course_work_id, file.filename, file_content)
         
         return jsonify({'success': True, 'message': 'Assignment submitted successfully'})
+    except HttpError as e:
+        error_details = json.loads(e.content.decode('utf-8'))
+        logger.error(f"HTTP Error {e.resp.status}: {error_details['error']['message']}")
+        return jsonify({'success': False, 'message': f"Error submitting assignment: {error_details['error']['message']}"})
     except Exception as e:
         logger.error(f"Error submitting assignment manually: {str(e)}")
-        return jsonify({'success': False, 'message': 'Error submitting assignment'})
+        return jsonify({'success': False, 'message': f'Error submitting assignment: {str(e)}'})
 
-def submit_assignment(course_id, course_work_id, filename, file_content):
-    try:
-        student_submissions = classroom_service.courses().courseWork().studentSubmissions().list(
-            courseId=course_id,
-            courseWorkId=course_work_id,
-            userId='me'
-        ).execute().get('studentSubmissions', [])
-        
-        if not student_submissions:
-            logger.warning(f"No submissions found for course ID {course_id} and coursework ID {course_work_id}")
-            return
-
-        student_submission = student_submissions[0]
-
-        # Attach the file
-        media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
-        classroom_service.courses().courseWork().studentSubmissions().modifyAttachments(
-            courseId=course_id,
-            courseWorkId=course_work_id,
-            id=student_submission['id'],
-            body={
-                'addAttachments': [{
-                    'driveFile': {
-                        'id': 'your_drive_file_id'  # Use the correct file ID here
-                    }
-                }]
-            }
-        ).execute()
-
-        # Turn in the assignment
-        classroom_service.courses().courseWork().studentSubmissions().turnIn(
-            courseId=course_id,
-            courseWorkId=course_work_id,
-            id=student_submission['id']
-        ).execute()
-
-        logger.info(f"Successfully submitted assignment: {filename}")
-    except Exception as e:
-        logger.error(f"Error submitting assignment: {str(e)}")
-        raise
-
+@app.route('/revoke')
+def revoke():
+    if 'credentials' in session:
+        credentials = Credentials(**session['credentials'])
+        revoke = requests.post('https://oauth2.googleapis.com/revoke',
+            params={'token': credentials.token},
+            headers = {'content-type': 'application/x-www-form-urlencoded'})
+        status_code = getattr(revoke, 'status_code')
+        if status_code == 200:
+            return redirect(url_for('authorize'))
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     app.run(debug=True, ssl_context='adhoc')
