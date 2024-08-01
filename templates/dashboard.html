@@ -29,3 +29,77 @@
     <i class="fas fa-spinner fa-spin"></i> Loading...
 </div>
 {% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInputs = document.querySelectorAll('.file-input');
+    const submitButtons = document.querySelectorAll('.submit-btn');
+    const loadingSpinner = document.getElementById('loading');
+    const notification = document.getElementById('notification');
+
+    fileInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const label = this.previousElementSibling;
+            if (this.files.length > 0) {
+                label.classList.add('file-selected');
+                label.textContent = this.files[0].name;
+            } else {
+                label.classList.remove('file-selected');
+                label.innerHTML = '<i class="fas fa-upload"></i> Choose File';
+            }
+        });
+    });
+
+    submitButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const assignmentId = this.dataset.assignmentId;
+            const fileInput = document.querySelector(`#file-${assignmentId}`);
+            
+            if (!fileInput.files.length) {
+                showNotification('Please select a file to upload', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            loadingSpinner.style.display = 'block';
+
+            fetch(`/submit/${assignmentId}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingSpinner.style.display = 'none';
+                if (data.success) {
+                    showNotification('Assignment submitted successfully', 'success');
+                    // Update the UI to reflect the submission
+                    const assignmentCard = this.closest('.assignment');
+                    assignmentCard.querySelector('.assignment-status').textContent = 'Submitted';
+                    assignmentCard.querySelector('.assignment-status').className = 'assignment-status status-submitted';
+                    this.remove();
+                    fileInput.closest('.file-upload').remove();
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                loadingSpinner.style.display = 'none';
+                showNotification('An error occurred while submitting the assignment', 'error');
+                console.error('Error:', error);
+            });
+        });
+    });
+
+    function showNotification(message, type) {
+        notification.textContent = message;
+        notification.className = `notification ${type} show`;
+        setTimeout(() => {
+            notification.classList.remove('show');
+        }, 3000);
+    }
+});
+</script>
+{% endblock %}

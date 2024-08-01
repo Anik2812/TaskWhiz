@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 from config import Config
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/static')
 app.config.from_object(Config)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
 
@@ -34,15 +34,13 @@ classroom_service = None
 drive_service = None
 
 SCOPES = [
-    'https://www.googleapis.com/auth/classroom.courses.readonly',
-    'https://www.googleapis.com/auth/classroom.coursework.me',
-    'https://www.googleapis.com/auth/classroom.coursework.students',
-    'https://www.googleapis.com/auth/classroom.rosters.readonly',
-    'https://www.googleapis.com/auth/classroom.student-submissions.me.readonly',
     'https://www.googleapis.com/auth/classroom.student-submissions.students.readonly',
+    'https://www.googleapis.com/auth/classroom.coursework.students',
+    'https://www.googleapis.com/auth/classroom.courses.readonly',
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/userinfo.profile',
-    'https://www.googleapis.com/auth/userinfo.email'
+    'https://www.googleapis.com/auth/userinfo.email',
+    'openid'
 ]
 
 def refresh_credentials():
