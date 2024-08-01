@@ -19,6 +19,8 @@ import smtplib
 from email.mime.text import MIMEText
 import requests
 from werkzeug.utils import secure_filename
+from googleapiclient.discovery import build
+from google.auth import default
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -40,7 +42,9 @@ SCOPES = [
     'https://www.googleapis.com/auth/drive.file',
     'openid',
     'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/userinfo.profile'
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/classroom.courses', 'https://www.googleapis.com/auth/classroom.coursework.me', 'https://www.googleapis.com/auth/classroom.coursework.students'
+
 ]
 
 def get_credentials():
@@ -146,7 +150,7 @@ def submit_assignment(classroom_service, drive_service, course_id, course_work_i
                     'driveFile': {
                         'id': file.get('id')
                     }
-                }]
+                }]                
             }
         ).execute()
 
@@ -503,6 +507,40 @@ def update_settings():
     flash('Settings updated successfully', 'success')
     return redirect(url_for('settings'))
 
+def check_permission(permissions, required_permission):
+    for permission in permissions:
+        if permission == required_permission:
+            return True
+    return False
+
+@app.route('/check_permission')
+def check_user_permission():
+    credentials = get_credentials()
+    if not credentials:
+        return jsonify({'status': 'Not authenticated'})
+
+    classroom_service = build('classroom', 'v1', credentials=credentials)
+
+    try:
+        # Assuming you have a way to get the current user's ID
+        user_id = 'me'
+        user_profile = classroom_service.userProfiles().get(userId=user_id).execute()
+        
+        # Print the entire user profile to understand its structure (for debugging)
+        print(json.dumps(user_profile, indent=2))
+
+        permissions = user_profile.get('permissions', [])
+        has_create_course_permission = check_permission(permissions, 'create_course')
+
+        return jsonify({
+            'user_id': user_id,
+            'has_create_course_permission': has_create_course_permission
+        })
+    except Exception as e:
+        logger.error(f"Error checking permissions: {str(e)}")
+        return jsonify({'success': False, 'message': f"Error checking permissions: {str(e)}"})
+
+
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
@@ -511,5 +549,33 @@ def page_not_found(e):
 def internal_server_error(e):
     return render_template('500.html'), 500
 
+def list_classroom_permissions():
+    # Obtain default credentials
+    creds, _ = default()
+    service = build('classroom', 'v1', credentials=creds)
+
+    try:
+        # Get the authenticated user's profile
+        profile = service.userProfiles().get(userId='me').execute()
+        print("User Profile:", profile)
+        
+        # Check permissions on a sample request
+        try:
+            results = service.courses().list(pageSize=10).execute()
+            courses = results.get('courses', [])
+            if not courses:
+                print('No courses found.')
+            else:
+                print('Courses:')
+                for course in courses:
+                    print(course['name'])
+                    
+        except Exception as e:
+            print(f"Permissions Error: {e}")
+        
+    except Exception as e:
+        print(f"API Error: {e}")
+
 if __name__ == '__main__':
     app.run(debug=True, ssl_context='adhoc')
+    app.run(debug=True)

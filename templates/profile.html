@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Profile{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <h1 class="fade-in">Your Profile</h1>
+    <div class="profile-card fade-in">
+        <img src="{{ user_info.picture }}" alt="Profile Picture" class="profile-picture">
+        <h2>{{ user_info.name }}</h2>
+        <p><i class="fas fa-envelope"></i> {{ user_info.email }}</p>
+        <p><i class="fas fa-user-circle"></i> {{ user_info.given_name }} {{ user_info.family_name }}</p>
+    </div>
+</div>
+{% endblock %}
