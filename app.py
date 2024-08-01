@@ -21,6 +21,7 @@ import requests
 from werkzeug.utils import secure_filename
 from googleapiclient.discovery import build
 from google.auth import default
+from google.auth.exceptions import RefreshError
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -40,10 +41,14 @@ SCOPES = [
     'https://www.googleapis.com/auth/classroom.coursework.students',
     'https://www.googleapis.com/auth/classroom.rosters.readonly',
     'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/classroom.coursework.me',
+    'https://www.googleapis.com/auth/classroom.student-submissions.students.readonly',
+    'https://www.googleapis.com/auth/classroom.profile.emails',
+    'https://www.googleapis.com/auth/classroom.profile.photos',
     'openid',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
-    'https://www.googleapis.com/auth/classroom.courses', 'https://www.googleapis.com/auth/classroom.coursework.me', 'https://www.googleapis.com/auth/classroom.coursework.students'
+    'https://www.googleapis.com/auth/classroom.courses'
 
 ]
 
@@ -55,7 +60,8 @@ def get_credentials():
         try:
             credentials.refresh(Request())
             session['credentials'] = credentials_to_dict(credentials)
-        except:
+        except RefreshError:
+            session.clear()
             return None
     return credentials
 
@@ -80,11 +86,26 @@ def before_request():
 @app.context_processor
 def inject_user():
     if 'credentials' in session:
-        credentials = Credentials(**session['credentials'])
-        user_info_service = build('oauth2', 'v2', credentials=credentials)
-        user_info = user_info_service.userinfo().get().execute()
-        return dict(user_info=user_info)
+        credentials = get_credentials()
+        if not credentials:
+            session.clear()
+            return dict()
+        try:
+            user_info_service = build('oauth2', 'v2', credentials=credentials)
+            user_info = user_info_service.userinfo().get().execute()
+            return dict(user_info=user_info)
+        except Exception as e:
+            logger.error(f"Error fetching user info: {str(e)}")
+            session.clear()
     return dict()
+
+@app.route('/check_auth_status')
+def check_auth_status():
+    if 'credentials' in session:
+        credentials = get_credentials()
+        if credentials:
+            return jsonify({'authenticated': True})
+    return jsonify({'authenticated': False})
 
 def send_email(subject, body):
     msg = MIMEText(body)
@@ -337,12 +358,13 @@ def dashboard():
         
         return render_template('dashboard.html', assignments=assignments)
     except Exception as e:
-        logger.error(f"Error in dashboard: {str(e)}")
+        logger.error(f"Error in dashboard: {str(e)}", exc_info=True)
         return redirect(url_for('error_page', message="Failed to load dashboard"))
 
 @app.route('/error')
 def error_page():
     error_message = request.args.get('message', 'An unknown error occurred.')
+    logger.error(f"Error page accessed: {error_message}")
     return render_template('error.html', error_message=error_message)
 
 @app.route('/logout')
@@ -426,8 +448,9 @@ def submit_assignment_manually(assignment_id):
         return jsonify({'success': True, 'message': 'Assignment submitted successfully'})
     except HttpError as e:
         error_details = json.loads(e.content.decode('utf-8'))
-        logger.error(f"HTTP Error {e.resp.status}: {error_details['error']['message']}")
-        return jsonify({'success': False, 'message': f"Error submitting assignment: {error_details['error']['message']}"})
+        error_message = error_details.get('error', {}).get('message', 'Unknown error occurred')
+        logger.error(f"HTTP Error {e.resp.status}: {error_message}")
+        return jsonify({'success': False, 'message': f"Error submitting assignment: {error_message}"})
     except Exception as e:
         logger.error(f"Error submitting assignment manually: {str(e)}")
         return jsonify({'success': False, 'message': f'Error submitting assignment: {str(e)}'})
@@ -617,6 +640,10 @@ def check_user_permission():
         logger.error(f"Error checking permissions: {str(e)}")
         return jsonify({'success': False, 'message': f"Error checking permissions: {str(e)}"})
 
+@app.errorhandler(RefreshError)
+def handle_refresh_error(e):
+    session.clear()
+    return redirect(url_for('authorize'))
 
 @app.errorhandler(404)
 def page_not_found(e):

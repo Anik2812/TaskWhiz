@@ -97,13 +97,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showNotification(message, type) {
+        const notificationContainer = document.getElementById('notification-container');
+        if (!notificationContainer) {
+            console.error('Notification container not found');
+            return;
+        }
+    
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         notification.textContent = message;
-        document.body.appendChild(notification);
+        notificationContainer.appendChild(notification);
+    
         setTimeout(() => {
             notification.classList.add('show');
         }, 100);
+    
         setTimeout(() => {
             notification.classList.remove('show');
             setTimeout(() => {
@@ -111,5 +119,20 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 300);
         }, 3000);
     }
+
+    function checkAuthStatus() {
+        fetch('/check_auth_status')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.authenticated) {
+                    window.location.href = '/authorize';
+                }
+            })
+            .catch(error => console.error('Error checking auth status:', error));
+    }
+    
+    setInterval(checkAuthStatus, 5 * 60 * 1000);
+    
+    document.addEventListener('DOMContentLoaded', checkAuthStatus);
 
 });
