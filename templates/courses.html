@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Courses{% endblock %}
+
+{% block content %}
+<div class="courses-container">
+    <h1 class="fade-in">Your Courses</h1>
+    <div id="courses" class="fade-in">
+        {% for course in courses %}
+        <div class="course">
+            <h2>{{ course.name }}</h2>
+            <p class="course-section"><i class="fas fa-chalkboard"></i> {{ course.section }}</p>
+            <p class="course-id"><i class="fas fa-hashtag"></i> Course ID: {{ course.id }}</p>
+            <a href="{{ course.alternateLink }}" target="_blank" class="btn">Open in Classroom</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

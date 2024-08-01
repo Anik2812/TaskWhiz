@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Assignments{% endblock %}
+
+{% block content %}
+<div class="assignments-container">
+    <h1 class="fade-in">All Assignments</h1>
+    <div id="assignments" class="fade-in">
+        {% for assignment in assignments %}
+        <div class="assignment">
+            <h2>{{ assignment.title }}</h2>
+            <p class="assignment-course"><i class="fas fa-chalkboard-teacher"></i> {{ assignment.course }}</p>
+            <p class="assignment-due-date"><i class="far fa-clock"></i> Due: {{ assignment.due_date }}</p>
+            <p class="assignment-description">{{ assignment.description }}</p>
+            <a href="{{ url_for('dashboard') }}#{{ assignment.id }}" class="btn">View Details</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
