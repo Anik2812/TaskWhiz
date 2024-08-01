@@ -77,6 +77,15 @@ def before_request():
     if 'credentials' in session:
         refresh_credentials()
 
+@app.context_processor
+def inject_user():
+    if 'credentials' in session:
+        credentials = Credentials(**session['credentials'])
+        user_info_service = build('oauth2', 'v2', credentials=credentials)
+        user_info = user_info_service.userinfo().get().execute()
+        return dict(user_info=user_info)
+    return dict()
+
 def send_email(subject, body):
     msg = MIMEText(body)
     msg['Subject'] = subject
@@ -441,8 +450,7 @@ def assignments():
     if not credentials:
         return redirect(url_for('authorize'))
     
-    if not classroom_service:
-        classroom_service = build('classroom', 'v1', credentials=credentials)
+    classroom_service = build('classroom', 'v1', credentials=credentials)
     
     try:
         courses = classroom_service.courses().list(pageSize=10).execute()
@@ -472,10 +480,8 @@ def courses():
     if not credentials:
         return redirect(url_for('authorize'))
     
-    if not classroom_service:
-        classroom_service = build('classroom', 'v1', credentials=credentials)
-    
     try:
+        classroom_service = build('classroom', 'v1', credentials=credentials)
         courses = classroom_service.courses().list(pageSize=10).execute()
         return render_template('courses.html', courses=courses.get('courses', []))
     except Exception as e:
@@ -496,45 +502,116 @@ def profile():
         logger.error(f"Error fetching user profile: {str(e)}")
         return redirect(url_for('error_page', message="Failed to load user profile"))
 
-@app.route('/settings')
+@app.route('/settings', methods=['GET', 'POST'])
 def settings():
-    return render_template('settings.html')
+    if 'credentials' not in session:
+        return redirect(url_for('authorize'))
+
+    credentials = Credentials(**session['credentials'])
+    user_info_service = build('oauth2', 'v2', credentials=credentials)
+    user_info = user_info_service.userinfo().get().execute()
+
+    if request.method == 'POST':
+        # Handle form submission
+        email_notifications = 'email_notifications' in request.form
+        github_token = request.form.get('github_token')
+
+        # Update the settings in the configuration
+        app.config['EMAIL_NOTIFICATIONS'] = email_notifications
+        app.config['GITHUB_TOKEN'] = github_token
+
+        settings = {
+            'email_notifications': email_notifications,
+            'github_token': github_token
+        }
+        with open('user_settings.json', 'w') as f:
+            json.dump(settings, f)
+
+        flash('Settings updated successfully', 'success')
+        return redirect(url_for('settings'))
+
+    # For GET requests, load the current settings
+    try:
+        with open('user_settings.json', 'r') as f:
+            user_settings = json.load(f)
+    except FileNotFoundError:
+        user_settings = {
+            'email_notifications': False,
+            'github_token': ''
+        }
+
+    return render_template('settings.html', user_settings=user_settings, user_info=user_info)
 
 @app.route('/update_settings', methods=['POST'])
 def update_settings():
-    # Here you can add logic to update user settings
-    # For example, updating email preferences, GitHub token, etc.
+    if 'credentials' not in session:
+        return redirect(url_for('authorize'))
+
+    credentials = Credentials(**session['credentials'])
+    user_info_service = build('oauth2', 'v2', credentials=credentials)
+    user_info = user_info_service.userinfo().get().execute()
+    user_id = user_info['id']
+
+    # Get form data
+    email_notifications = 'email_notifications' in request.form
+    github_token = request.form.get('github_token')
+    custom_setting = request.form.get('custom_setting')
+
+    # Update settings
+    user_settings = {
+        'email_notifications': email_notifications,
+        'github_token': github_token,
+        'custom_setting': custom_setting
+    }
+
+    # Save settings to a file (in production, use a database)
+    settings_file = f'user_settings_{user_id}.json'
+    with open(settings_file, 'w') as f:
+        json.dump(user_settings, f)
+
+    # Update application config
+    app.config['EMAIL_NOTIFICATIONS'] = email_notifications
+    app.config['GITHUB_TOKEN'] = github_token
+
+    # If you're using environment variables, you might want to update them as well
+    os.environ['GITHUB_TOKEN'] = github_token
+
     flash('Settings updated successfully', 'success')
     return redirect(url_for('settings'))
 
 def check_permission(permissions, required_permission):
-    for permission in permissions:
-        if permission == required_permission:
-            return True
-    return False
+    if isinstance(permissions, list):
+        return required_permission in permissions
+    elif isinstance(permissions, dict):
+        return permissions.get(required_permission, False)
+    else:
+        return False
 
-@app.route('/check_permission')
+@app.route('/check_user_permission')
 def check_user_permission():
-    credentials = get_credentials()
-    if not credentials:
+    if 'credentials' not in session:
         return jsonify({'status': 'Not authenticated'})
 
+    credentials = Credentials(**session['credentials'])
     classroom_service = build('classroom', 'v1', credentials=credentials)
 
     try:
-        # Assuming you have a way to get the current user's ID
         user_id = 'me'
         user_profile = classroom_service.userProfiles().get(userId=user_id).execute()
         
-        # Print the entire user profile to understand its structure (for debugging)
-        print(json.dumps(user_profile, indent=2))
-
+        # Get permissions from user profile
         permissions = user_profile.get('permissions', [])
-        has_create_course_permission = check_permission(permissions, 'create_course')
+
+        # Check for specific permissions
+        has_create_course_permission = check_permission(permissions, 'CREATE_COURSE')
+        has_view_course_permission = check_permission(permissions, 'VIEW_COURSE')
+        has_manage_course_permission = check_permission(permissions, 'MANAGE_COURSE')
 
         return jsonify({
             'user_id': user_id,
-            'has_create_course_permission': has_create_course_permission
+            'has_create_course_permission': has_create_course_permission,
+            'has_view_course_permission': has_view_course_permission,
+            'has_manage_course_permission': has_manage_course_permission
         })
     except Exception as e:
         logger.error(f"Error checking permissions: {str(e)}")

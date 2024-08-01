@@ -5,7 +5,7 @@
 {% block content %}
 <div class="settings-container">
     <h1 class="fade-in">Settings</h1>
-    <form action="{{ url_for('update_settings') }}" method="POST" class="settings-form fade-in">
+    <form action="{{ url_for('settings') }}" method="POST" class="settings-form fade-in">
         <div class="form-group">
             <label for="email_notifications">Email Notifications</label>
             <input type="checkbox" id="email_notifications" name="email_notifications" {% if user_settings.email_notifications %}checked{% endif %}>
