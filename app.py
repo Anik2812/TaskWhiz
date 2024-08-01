@@ -34,9 +34,10 @@ classroom_service = None
 drive_service = None
 
 SCOPES = [
-    'https://www.googleapis.com/auth/classroom.student-submissions.students.readonly',
-    'https://www.googleapis.com/auth/classroom.coursework.students',
     'https://www.googleapis.com/auth/classroom.courses.readonly',
+    'https://www.googleapis.com/auth/classroom.coursework.students',
+    'https://www.googleapis.com/auth/classroom.student-submissions.students.readonly',
+    'https://www.googleapis.com/auth/classroom.rosters.readonly',
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email',
@@ -75,10 +76,29 @@ def send_email(subject, body):
     except Exception as e:
         logger.error(f"Failed to send email: {str(e)}")
 
-def check_and_submit_assignments():
+def initialize_clients():
     global github_client, classroom_service, drive_service
-    if not github_client or not classroom_service or not drive_service:
-        logger.warning("GitHub, Classroom, or Drive client not initialized")
+    
+    if 'credentials' not in session:
+        logger.warning("No credentials found in session")
+        return False
+
+    credentials = Credentials(**session['credentials'])
+    
+    if not github_client:
+        github_client = Github(app.config['GITHUB_TOKEN'])
+    
+    if not classroom_service:
+        classroom_service = build('classroom', 'v1', credentials=credentials)
+    
+    if not drive_service:
+        drive_service = build('drive', 'v3', credentials=credentials)
+    
+    return True
+
+def check_and_submit_assignments():
+    if not initialize_clients():
+        logger.warning("Failed to initialize clients")
         return
 
     try:
@@ -97,6 +117,11 @@ def check_and_submit_assignments():
                         logger.info(f"Automatically submitted assignment: {work['title']}")
                     except GithubException:
                         logger.warning(f"No submission file found for {work['title']}")
+    except HttpError as e:
+        if e.resp.status == 403:
+            logger.error("Permission denied. Please check your Google Classroom API permissions.")
+        else:
+            logger.error(f"HTTP Error in check_and_submit_assignments: {str(e)}")
     except Exception as e:
         logger.error(f"Error in check_and_submit_assignments: {str(e)}")
 
@@ -106,53 +131,64 @@ def parse_due_date(due_date):
     return datetime(year=due_date.get('year', 1), month=due_date.get('month', 1), day=due_date.get('day', 1))
 
 def submit_assignment(course_id, course_work_id, filename, file_content):
-    try:
-        student_submissions = classroom_service.courses().courseWork().studentSubmissions().list(
-            courseId=course_id,
-            courseWorkId=course_work_id,
-            userId='me'
-        ).execute().get('studentSubmissions', [])
-        
-        if not student_submissions:
-            logger.warning(f"No submissions found for course ID {course_id} and coursework ID {course_work_id}")
+    max_retries = 3
+    retry_delay = 5  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            student_submissions = classroom_service.courses().courseWork().studentSubmissions().list(
+                courseId=course_id,
+                courseWorkId=course_work_id,
+                userId='me'
+            ).execute().get('studentSubmissions', [])
+            
+            if not student_submissions:
+                logger.warning(f"No submissions found for course ID {course_id} and coursework ID {course_work_id}")
+                return
+
+            student_submission = student_submissions[0]
+
+            # Create a new file in Google Drive
+            file_metadata = {'name': filename}
+            media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
+            file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+
+            # Attach the file
+            attachment = classroom_service.courses().courseWork().studentSubmissions().modifyAttachments(
+                courseId=course_id,
+                courseWorkId=course_work_id,
+                id=student_submission['id'],
+                body={
+                    'addAttachments': [{
+                        'driveFile': {
+                            'id': file.get('id')
+                        }
+                    }]
+                }
+            ).execute()
+
+            # Turn in the assignment
+            classroom_service.courses().courseWork().studentSubmissions().turnIn(
+                courseId=course_id,
+                courseWorkId=course_work_id,
+                id=student_submission['id']
+            ).execute()
+
+            logger.info(f"Successfully submitted assignment: {filename}")
             return
-
-        student_submission = student_submissions[0]
-
-        # Create a new file in Google Drive
-        file_metadata = {'name': filename}
-        media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
-        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-
-        # Attach the file
-        attachment = classroom_service.courses().courseWork().studentSubmissions().modifyAttachments(
-            courseId=course_id,
-            courseWorkId=course_work_id,
-            id=student_submission['id'],
-            body={
-                'addAttachments': [{
-                    'driveFile': {
-                        'id': file.get('id')
-                    }
-                }]
-            }
-        ).execute()
-
-        # Turn in the assignment
-        classroom_service.courses().courseWork().studentSubmissions().turnIn(
-            courseId=course_id,
-            courseWorkId=course_work_id,
-            id=student_submission['id']
-        ).execute()
-
-        logger.info(f"Successfully submitted assignment: {filename}")
-    except HttpError as e:
-        error_details = json.loads(e.content.decode('utf-8'))
-        logger.error(f"HTTP Error {e.resp.status}: {error_details['error']['message']}")
-        raise
-    except Exception as e:
-        logger.error(f"Error submitting assignment: {str(e)}")
-        raise
+        except HttpError as e:
+            if e.resp.status == 403:
+                logger.error("Permission denied. Please check your Google Classroom API permissions.")
+                break
+            elif attempt < max_retries - 1:
+                logger.warning(f"HTTP Error {e.resp.status}: {str(e)}. Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                logger.error(f"Failed to submit assignment after {max_retries} attempts: {str(e)}")
+                raise
+        except Exception as e:
+            logger.error(f"Error submitting assignment: {str(e)}")
+            raise
 
 def run_scheduler():
     while True:
@@ -205,11 +241,8 @@ def oauth2callback():
         credentials = flow.credentials
         logger.info(f"Successfully obtained credentials: {credentials.to_json()}")
         
-        global classroom_service, drive_service
-        classroom_service = build('classroom', 'v1', credentials=credentials)
-        drive_service = build('drive', 'v3', credentials=credentials)
-        
         session['credentials'] = credentials_to_dict(credentials)
+        initialize_clients()
         return redirect(url_for('dashboard'))
     except Exception as e:
         logger.error(f"OAuth error: {str(e)}")
@@ -228,17 +261,8 @@ def credentials_to_dict(credentials):
 
 @app.route('/dashboard')
 def dashboard():
-    global github_client, classroom_service
-    
-    credentials = refresh_credentials()
-    if not credentials:
+    if not initialize_clients():
         return redirect(url_for('authorize'))
-    
-    if not github_client:
-        github_client = Github(app.config['GITHUB_TOKEN'])
-    
-    if not classroom_service:
-        classroom_service = build('classroom', 'v1', credentials=credentials)
     
     try:
         repo = github_client.get_repo(app.config['GITHUB_REPO'])
@@ -292,6 +316,9 @@ def logout():
 
 @app.route('/submit/<assignment_id>', methods=['POST'])
 def submit_assignment_manually(assignment_id):
+    if not initialize_clients():
+        return jsonify({'success': False, 'message': 'Not authenticated'})
+
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': 'No file part'})
     file = request.files['file']
@@ -344,12 +371,8 @@ def revoke():
 
 @app.route('/assignments')
 def assignments():
-    credentials = refresh_credentials()
-    if not credentials:
+    if not initialize_clients():
         return redirect(url_for('authorize'))
-    
-    if not classroom_service:
-        classroom_service = build('classroom', 'v1', credentials=credentials)
     
     try:
         courses = classroom_service.courses().list(pageSize=10).execute()
@@ -375,12 +398,8 @@ def assignments():
 
 @app.route('/courses')
 def courses():
-    credentials = refresh_credentials()
-    if not credentials:
+    if not initialize_clients():
         return redirect(url_for('authorize'))
-    
-    if not classroom_service:
-        classroom_service = build('classroom', 'v1', credentials=credentials)
     
     try:
         courses = classroom_service.courses().list(pageSize=10).execute()
@@ -391,12 +410,11 @@ def courses():
 
 @app.route('/profile')
 def profile():
-    credentials = refresh_credentials()
-    if not credentials:
+    if not initialize_clients():
         return redirect(url_for('authorize'))
     
     try:
-        user_info_service = build('oauth2', 'v2', credentials=credentials)
+        user_info_service = build('oauth2', 'v2', credentials=Credentials(**session['credentials']))
         user_info = user_info_service.userinfo().get().execute()
         return render_template('profile.html', user_info=user_info)
     except Exception as e:
