@@ -2,18 +2,10 @@
 
 {% block title %}Analytics{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.css">
-{% endblock %}
-
 {% block content %}
 <div class="analytics-container">
-    <h1 class="fade-in">Your Analytics</h1>
+    <h1 class="fade-in">Analytics Dashboard</h1>
     <div class="analytics-summary">
-        <div class="summary-card">
-            <h3>Overall Completion Rate</h3>
-            <p>{{ overall_completion_rate }}%</p>
-        </div>
         <div class="summary-card">
             <h3>Total Courses</h3>
             <p>{{ total_courses }}</p>
@@ -22,23 +14,29 @@
             <h3>Total Assignments</h3>
             <p>{{ total_assignments }}</p>
         </div>
+        <div class="summary-card">
+            <h3>Overall Completion Rate</h3>
+            <p>{{ overall_completion_rate }}%</p>
+        </div>
     </div>
-    <div class="chart-container fade-in">
-        <h2>Course Completion Rates</h2>
-        <canvas id="courseCompletionChart"></canvas>
+    <div class="analytics-charts">
+        <div class="chart-container">
+            <h2>Submission Timeline</h2>
+            <canvas id="submissionChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h2>Course Completion Rates</h2>
+            <canvas id="completionChart"></canvas>
+        </div>
     </div>
-    <div class="chart-container fade-in">
-        <h2>Assignment Submission Timeline</h2>
-        <canvas id="submissionTimelineChart"></canvas>
-    </div>
-    <div class="analytics-table fade-in">
+    <div class="analytics-table">
         <h2>Course Details</h2>
         <table>
             <thead>
                 <tr>
                     <th>Course Name</th>
                     <th>Total Assignments</th>
-                    <th>Completed Assignments</th>
+                    <th>Submitted Assignments</th>
                     <th>Completion Rate</th>
                 </tr>
             </thead>
@@ -57,7 +55,17 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    var submissionData = {
+        labels: "{{ submission_timeline|tojson|safe }}",
+        counts: "{{ submission_counts|tojson|safe }}"
+    };
+    var completionData = {
+        labels: "{{ analytics_data|map(attribute='course_name')|list|tojson|safe }}",
+        rates: "{{ analytics_data|map(attribute='completion_rate')|list|tojson|safe }}"
+    };
+</script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
 {% endblock %}

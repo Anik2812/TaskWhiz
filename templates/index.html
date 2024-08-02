@@ -7,10 +7,11 @@
     <h1>Welcome to TaskWhiz</h1>
     <p>Manage your college assignments with ease!</p>
     {% if not current_user.is_authenticated %}
-    {% if 'credentials' in session %}
-    <a href="{{ url_for('dashboard') }}" class="btn btn-primary"><i class="fas fa-arrow-right"></i> Go to Dashboard</a>
-    {% else %}
-    <a href="{{ url_for('authorize') }}" class="btn btn-primary"><i class="fab fa-google"></i> Login with Google</a>
+        {% if 'credentials' in session %}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary"><i class="fas fa-arrow-right"></i> Go to Dashboard</a>
+        {% else %}
+            <a href="{{ url_for('authorize') }}" class="btn btn-primary"><i class="fab fa-google"></i> Login with Google</a>
+        {% endif %}
     {% endif %}
 </div>
 <div class="features">

@@ -27,6 +27,10 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from flask_talisman import Talisman
+from flask_login import LoginManager, current_user
+from flask_login import UserMixin
+
+
 
 # Enhanced logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s')
@@ -57,7 +61,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///taskwhiz.db'
 db = SQLAlchemy(app)
 
 # User model
-class User(db.Model):
+class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     settings = db.Column(db.JSON)
@@ -123,6 +127,14 @@ def inject_user():
             logger.error(f"Error fetching user info: {str(e)}")
             session.clear()
     return dict()
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+@login_manager.user_loader
+def load_user(user_id):
+    # Return your User object here
+    return User.query.get(int(user_id))
 
 @app.route('/check_auth_status')
 @cache.cached(timeout=60)
