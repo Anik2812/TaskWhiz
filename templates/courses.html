@@ -22,10 +22,21 @@
             <p class="course-section"><i class="fas fa-chalkboard"></i> {{ course.section }}</p>
             <p class="course-id"><i class="fas fa-hashtag"></i> Course ID: {{ course.id }}</p>
             <p class="course-description">{{ course.description }}</p>
-            <a href="{{ course.alternateLink }}" target="_blank" class="btn">Open in Classroom</a>
-            <a href="{{ url_for('assignments', course_id=course.id) }}" class="btn">View Assignments</a>
+            <div class="course-actions">
+                <a href="{{ course.alternateLink }}" target="_blank" class="btn">Open in Classroom</a>
+                <a href="{{ url_for('assignments', course_id=course.id) }}" class="btn">View Assignments</a>
+                <button class="btn btn-secondary toggle-details">More Details</button>
+            </div>
+            <div class="course-details" style="display: none;">
+                <p><strong>Description Heading:</strong> {{ course.descriptionHeading }}</p>
+                <p><strong>Room:</strong> {{ course.room }}</p>
+                <p><strong>Enrollment Code:</strong> {{ course.enrollmentCode }}</p>
+            </div>
         </div>
         {% endfor %}
+    </div>
+    <div id="pagination" class="pagination">
+        <!-- Pagination controls will be added here by JavaScript -->
     </div>
 </div>
 {% endblock %}

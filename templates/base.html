@@ -12,6 +12,9 @@
 <body>
     <header>
         <nav>
+            <div class="logo">
+                <a href="{{ url_for('index') }}">TaskWhiz</a>
+            </div>
             <ul>
                 <li><a href="{{ url_for('index') }}"><i class="fas fa-home"></i> Home</a></li>
                 <li><a href="{{ url_for('dashboard') }}"><i class="fas fa-tasks"></i> Dashboard</a></li>
@@ -23,6 +26,9 @@
                 <li><a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                 <li><a href="#" id="theme-toggle"><i class="fas fa-moon"></i> Toggle Theme</a></li>
             </ul>
+            <div class="mobile-menu-toggle">
+                <i class="fas fa-bars"></i>
+            </div>
         </nav>
     </header>
     <main>

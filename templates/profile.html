@@ -11,5 +11,38 @@
         <p><i class="fas fa-envelope"></i> {{ user_info.email }}</p>
         <p><i class="fas fa-user-circle"></i> {{ user_info.given_name }} {{ user_info.family_name }}</p>
     </div>
+    <div class="profile-stats">
+        <h3>Your Statistics</h3>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <i class="fas fa-book"></i>
+                <p>Total Courses</p>
+                <span id="total-courses">Loading...</span>
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-tasks"></i>
+                <p>Total Assignments</p>
+                <span id="total-assignments">Loading...</span>
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-check-circle"></i>
+                <p>Completed Assignments</p>
+                <span id="completed-assignments">Loading...</span>
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-chart-line"></i>
+                <p>Overall Completion Rate</p>
+                <span id="completion-rate">Loading...</span>
+            </div>
+        </div>
+    </div>
+    <div class="profile-actions">
+        <a href="{{ url_for('settings') }}" class="btn btn-primary">Edit Settings</a>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Go to Dashboard</a>
+    </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/profile.js') }}"></script>
 {% endblock %}

@@ -7,9 +7,10 @@
     <h1>Welcome to TaskWhiz</h1>
     <p>Manage your college assignments with ease!</p>
     {% if not current_user.is_authenticated %}
-    <a href="{{ url_for('authorize') }}" class="btn btn-primary"><i class="fab fa-google"></i> Login with Google</a>
-    {% else %}
+    {% if 'credentials' in session %}
     <a href="{{ url_for('dashboard') }}" class="btn btn-primary"><i class="fas fa-arrow-right"></i> Go to Dashboard</a>
+    {% else %}
+    <a href="{{ url_for('authorize') }}" class="btn btn-primary"><i class="fab fa-google"></i> Login with Google</a>
     {% endif %}
 </div>
 <div class="features">
@@ -34,4 +35,25 @@
         <p>Track your progress and get insights into your academic performance.</p>
     </div>
 </div>
+<div class="testimonials">
+    <h2>What Our Users Say</h2>
+    <div class="testimonial-carousel">
+        <div class="testimonial">
+            <p>"TaskWhiz has revolutionized how I manage my assignments. It's a game-changer!"</p>
+            - Sarah J., Computer Science Student
+        </div>
+        <div class="testimonial">
+            <p>"The GitHub integration is fantastic. It makes coding assignments so much easier to handle."</p>
+            - Mike T., Software Engineering Major
+        </div>
+        <div class="testimonial">
+            <p>"I love the analytics feature. It helps me stay on top of my academic performance."</p>
+            - Emily R., Business Administration Student
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/index.js') }}"></script>
 {% endblock %}
