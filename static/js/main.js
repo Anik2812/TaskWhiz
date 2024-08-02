@@ -1,5 +1,11 @@
-function setupThemeToggle() {
+document.addEventListener('DOMContentLoaded', function() {
+    const assignmentCards = document.querySelectorAll('.assignment');
+    const fileInputs = document.querySelectorAll('.file-input');
+    const submitButtons = document.querySelectorAll('.submit-btn');
     const themeToggle = document.getElementById('theme-toggle');
+    const loadingSpinner = document.getElementById('loading');
+    
+    // Theme toggle functionality
     if (themeToggle) {
         themeToggle.addEventListener('click', function(e) {
             e.preventDefault();
@@ -14,41 +20,19 @@ function setupThemeToggle() {
             localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
         });
     }
-}
 
-
-
-function applyTheme() {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
-        document.body.classList.add('dark-theme');
-        const icon = document.querySelector('#theme-toggle i');
-        if (icon) {
-            icon.classList.replace('fa-moon', 'fa-sun');
+    function applyTheme() {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-theme');
+            const icon = document.querySelector('#theme-toggle i');
+            if (icon) {
+                icon.classList.replace('fa-moon', 'fa-sun');
+            }
         }
     }
-}
 
-document.addEventListener('DOMContentLoaded', function() {
-    const assignmentCards = document.querySelectorAll('.assignment');
-    const fileInputs = document.querySelectorAll('.file-input');
-    const submitButtons = document.querySelectorAll('.submit-btn');
-    const themeToggle = document.getElementById('theme-toggle');
-    const loadingSpinner = document.getElementById('loading');
-
-    // Theme toggle functionality
-    if (themeToggle) {
-        themeToggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.body.classList.toggle('dark-theme');
-            const icon = this.querySelector('i');
-            if (icon.classList.contains('fa-moon')) {
-                icon.classList.replace('fa-moon', 'fa-sun');
-            } else {
-                icon.classList.replace('fa-sun', 'fa-moon');
-            }
-        });
-    }
+    
 
     // Assignment card hover effect
     assignmentCards.forEach(card => {
@@ -168,8 +152,4 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setupThemeToggle();
     applyTheme();
-
 });
-
-setupThemeToggle();
-    applyTheme();

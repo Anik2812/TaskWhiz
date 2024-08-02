@@ -4,11 +4,26 @@
 
 {% block content %}
 <div class="dashboard-container">
-    <h1 class="fade-in">Your Assignments</h1>
+    <h1 class="fade-in">Your Dashboard</h1>
+    <div class="dashboard-summary">
+        <div class="summary-card">
+            <h3>Total Assignments</h3>
+            <p>{{ total_assignments }}</p>
+        </div>
+        <div class="summary-card">
+            <h3>Completed Assignments</h3>
+            <p>{{ completed_assignments }}</p>
+        </div>
+        <div class="summary-card">
+            <h3>Upcoming Deadlines</h3>
+            <p>{{ upcoming_deadlines }}</p>
+        </div>
+    </div>
+    <h2>Recent Assignments</h2>
     <div id="assignments" class="fade-in">
         {% for assignment in assignments %}
         <div class="assignment" data-id="{{ assignment.id }}">
-            <h2>{{ assignment.title }}</h2>
+            <h3>{{ assignment.title }}</h3>
             <p class="assignment-course"><i class="fas fa-chalkboard-teacher"></i> {{ assignment.course }}</p>
             <p class="assignment-due-date"><i class="far fa-clock"></i> Due: {{ assignment.due_date }}</p>
             <p class="assignment-status status-{{ assignment.status.lower().replace(' ', '-') }}">{{ assignment.status }}</p>
@@ -22,15 +37,16 @@
             <button class="submit-btn" data-assignment-id="{{ assignment.id }}">Submit Assignment</button>
             {% endif %}
         </div>
-        <div id="notification-container"></div>
         {% endfor %}
     </div>
+    <a href="{{ url_for('assignments') }}" class="btn btn-primary">View All Assignments</a>
 </div>
 <div id="loading" class="loading-spinner" style="display: none;">
     <i class="fas fa-spinner fa-spin"></i> Loading...
 </div>
+<div id="notification-container"></div>
 {% endblock %}
 
 {% block scripts %}
-<script src="../static/js/main.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

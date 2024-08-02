@@ -5,16 +5,36 @@
 {% block content %}
 <div class="settings-container">
     <h1 class="fade-in">Settings</h1>
-    <form action="{{ url_for('settings') }}" method="POST" class="settings-form fade-in">
+    <form method="POST" action="{{ url_for('update_settings') }}" class="settings-form fade-in">
         <div class="form-group">
-            <label for="email_notifications">Email Notifications</label>
-            <input type="checkbox" id="email_notifications" name="email_notifications" {% if user_settings.email_notifications %}checked{% endif %}>
+            <label for="email_notifications">
+                <input type="checkbox" id="email_notifications" name="email_notifications" 
+                       {% if user_settings.email_notifications %}checked{% endif %}>
+                Enable Email Notifications
+            </label>
         </div>
         <div class="form-group">
-            <label for="github_token">GitHub Token</label>
-            <input type="password" id="github_token" name="github_token" value="{{ user_settings.github_token }}">
+            <label for="github_token">GitHub Token:</label>
+            <input type="password" id="github_token" name="github_token" 
+                   value="{{ user_settings.github_token }}">
         </div>
-        <button type="submit" class="btn">Save Settings</button>
+        <div class="form-group">
+            <label for="custom_setting">Custom Setting:</label>
+            <input type="text" id="custom_setting" name="custom_setting" 
+                   value="{{ user_settings.custom_setting }}">
+        </div>
+        <div class="form-group">
+            <label for="theme">Theme:</label>
+            <select id="theme" name="theme">
+                <option value="light" {% if user_settings.theme == 'light' %}selected{% endif %}>Light</option>
+                <option value="dark" {% if user_settings.theme == 'dark' %}selected{% endif %}>Dark</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Settings</button>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 {% endblock %}

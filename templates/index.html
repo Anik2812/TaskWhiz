@@ -6,8 +6,11 @@
 <div class="hero fade-in">
     <h1>Welcome to TaskWhiz</h1>
     <p>Manage your college assignments with ease!</p>
-    <a href="{{ url_for('dashboard') }}" class="btn"><i class="fas fa-arrow-right"></i> Go to Dashboard</a>
-    <a href="{{ url_for('revoke') }}" class="btn btn-warning">Reauthorize Application</a>
+    {% if not current_user.is_authenticated %}
+    <a href="{{ url_for('authorize') }}" class="btn btn-primary"><i class="fab fa-google"></i> Login with Google</a>
+    {% else %}
+    <a href="{{ url_for('dashboard') }}" class="btn btn-primary"><i class="fas fa-arrow-right"></i> Go to Dashboard</a>
+    {% endif %}
 </div>
 <div class="features">
     <div class="feature fade-in">
@@ -24,6 +27,11 @@
         <i class="fas fa-bell"></i>
         <h2>Smart Notifications</h2>
         <p>Receive timely reminders for upcoming assignments and deadlines.</p>
+    </div>
+    <div class="feature fade-in">
+        <i class="fas fa-chart-line"></i>
+        <h2>Analytics</h2>
+        <p>Track your progress and get insights into your academic performance.</p>
     </div>
 </div>
 {% endblock %}
