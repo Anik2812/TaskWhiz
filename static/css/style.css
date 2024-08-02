@@ -23,6 +23,15 @@ body {
   transition: var(--transition);
 }
 
+body.dark-theme {
+  background-color: #333;
+  color: #fff;
+}
+
+.dark-theme .assignment {
+  background-color: #444;
+}
+
 header {
   background-color: var(--primary-color);
   color: #fff;

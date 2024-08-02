@@ -377,7 +377,10 @@ def submit_assignment_manually(assignment_id):
     if 'credentials' not in session:
         return jsonify({'success': False, 'message': 'Not authenticated'})
 
-    credentials = Credentials(**session['credentials'])
+    credentials = get_credentials()
+    if not credentials:
+        return jsonify({'success': False, 'message': 'Invalid credentials'})
+
     classroom_service = build('classroom', 'v1', credentials=credentials)
     drive_service = build('drive', 'v3', credentials=credentials)
 
