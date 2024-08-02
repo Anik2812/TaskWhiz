@@ -2,6 +2,8 @@ import os
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key'
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///taskwhiz.db'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
     GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
     GITHUB_REPO = os.environ.get('GITHUB_REPO', 'Anik2812/assignments')
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')

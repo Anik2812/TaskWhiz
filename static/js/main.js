@@ -85,14 +85,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 showNotification('Please select a file to upload.', 'error');
                 return;
             }
-
+    
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
-
+    
             if (loadingSpinner) {
                 loadingSpinner.style.display = 'block';
             }
-
+    
             fetch(`/submit/${assignmentId}`, {
                 method: 'POST',
                 body: formData
@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     showNotification('Assignment submitted successfully!', 'success');
                     updateAssignmentStatus(assignmentId, 'Submitted');
                 } else {
-                    showNotification('Error submitting assignment. Please try again.', 'error');
+                    showNotification(data.message || 'Error submitting assignment. Please try again.', 'error');
                 }
             })
             .catch(error => {

@@ -5,6 +5,7 @@ import io
 import threading
 import time
 from datetime import datetime, timedelta
+from functools import wraps
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from github import Github, GithubException
@@ -19,11 +20,16 @@ import smtplib
 from email.mime.text import MIMEText
 import requests
 from werkzeug.utils import secure_filename
-from googleapiclient.discovery import build
 from google.auth import default
 from google.auth.exceptions import RefreshError
+from flask_caching import Cache
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_cors import CORS
+from flask_talisman import Talisman
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Enhanced logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s')
 logger = logging.getLogger(__name__)
 
 from config import Config
@@ -32,9 +38,32 @@ app = Flask(__name__, static_url_path='/static')
 app.config.from_object(Config)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
 
-github_client = None
-classroom_service = None
-drive_service = None
+# Enable CORS
+CORS(app)
+
+# Enable security headers
+Talisman(app)
+
+# Setup caching
+cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+
+# Setup rate limiting
+limiter = Limiter(app, key_func=get_remote_address)
+
+# Setup database connection (using SQLAlchemy as an example)
+from flask_sqlalchemy import SQLAlchemy
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///taskwhiz.db'
+db = SQLAlchemy(app)
+
+# User model
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    settings = db.Column(db.JSON)
+
+# Create tables
+with app.app_context():
+    db.create_all()
 
 SCOPES = [
     'https://www.googleapis.com/auth/classroom.courses.readonly',
@@ -49,9 +78,17 @@ SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/classroom.courses'
-
 ]
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'credentials' not in session:
+            return redirect(url_for('authorize'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@cache.memoize(timeout=300)
 def get_credentials():
     if 'credentials' not in session:
         return None
@@ -65,23 +102,10 @@ def get_credentials():
             return None
     return credentials
 
-def refresh_credentials():
-    if 'credentials' not in session:
-        return None
-    credentials = Credentials(**session['credentials'])
-    if credentials.expired and credentials.refresh_token:
-        try:
-            credentials.refresh(Request())
-            session['credentials'] = credentials_to_dict(credentials)
-        except Exception as e:
-            logger.error(f"Error refreshing credentials: {str(e)}")
-            return None
-    return credentials
-
 @app.before_request
 def before_request():
     if 'credentials' in session:
-        refresh_credentials()
+        get_credentials()
 
 @app.context_processor
 def inject_user():
@@ -100,6 +124,7 @@ def inject_user():
     return dict()
 
 @app.route('/check_auth_status')
+@cache.cached(timeout=60)
 def check_auth_status():
     if 'credentials' in session:
         credentials = get_credentials()
@@ -149,7 +174,7 @@ def check_and_submit_assignments():
                     except GithubException:
                         logger.warning(f"No submission file found for {work['title']}")
     except Exception as e:
-            logger.error(f"Error in check_and_submit_assignments: {str(e)}")
+        logger.error(f"Error in check_and_submit_assignments: {str(e)}")
 
 def submit_assignment(classroom_service, drive_service, course_id, course_work_id, filename, file_content):
     try:
@@ -165,12 +190,10 @@ def submit_assignment(classroom_service, drive_service, course_id, course_work_i
 
         student_submission = student_submissions[0]
 
-        # Create a new file in Google Drive
         file_metadata = {'name': filename}
         media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
         file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
-        # Attach the file
         attachment = classroom_service.courses().courseWork().studentSubmissions().modifyAttachments(
             courseId=course_id,
             courseWorkId=course_work_id,
@@ -184,7 +207,6 @@ def submit_assignment(classroom_service, drive_service, course_id, course_work_i
             }
         ).execute()
 
-        # Turn in the assignment
         classroom_service.courses().courseWork().studentSubmissions().turnIn(
             courseId=course_id,
             courseWorkId=course_work_id,
@@ -202,55 +224,6 @@ def parse_due_date(due_date):
     if not due_date:
         return None
     return datetime(year=due_date.get('year', 1), month=due_date.get('month', 1), day=due_date.get('day', 1))
-
-def submit_assignment(course_id, course_work_id, filename, file_content):
-    try:
-        student_submissions = classroom_service.courses().courseWork().studentSubmissions().list(
-            courseId=course_id,
-            courseWorkId=course_work_id,
-            userId='me'
-        ).execute().get('studentSubmissions', [])
-        
-        if not student_submissions:
-            logger.warning(f"No submissions found for course ID {course_id} and coursework ID {course_work_id}")
-            return
-
-        student_submission = student_submissions[0]
-
-        # Create a new file in Google Drive
-        file_metadata = {'name': filename}
-        media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
-        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-
-        # Attach the file
-        attachment = classroom_service.courses().courseWork().studentSubmissions().modifyAttachments(
-            courseId=course_id,
-            courseWorkId=course_work_id,
-            id=student_submission['id'],
-            body={
-                'addAttachments': [{
-                    'driveFile': {
-                        'id': file.get('id')
-                    }
-                }]
-            }
-        ).execute()
-
-        # Turn in the assignment
-        classroom_service.courses().courseWork().studentSubmissions().turnIn(
-            courseId=course_id,
-            courseWorkId=course_work_id,
-            id=student_submission['id']
-        ).execute()
-
-        logger.info(f"Successfully submitted assignment: {filename}")
-    except HttpError as e:
-        error_details = json.loads(e.content.decode('utf-8'))
-        logger.error(f"HTTP Error {e.resp.status}: {error_details['error']['message']}")
-        raise
-    except Exception as e:
-        logger.error(f"Error submitting assignment: {str(e)}")
-        raise
 
 def run_scheduler():
     while True:
@@ -271,10 +244,12 @@ def get_google_auth_flow():
     return flow
 
 @app.route('/')
+@cache.cached(timeout=300)
 def index():
     return render_template('index.html')
 
 @app.route('/check_auth')
+@limiter.limit("10/minute")
 def check_auth():
     if 'credentials' not in session:
         return jsonify({'status': 'Not authenticated'})
@@ -313,10 +288,10 @@ def credentials_to_dict(credentials):
     }
 
 @app.route('/dashboard')
+@login_required
+@cache.cached(timeout=60)
 def dashboard():
     credentials = get_credentials()
-    if not credentials:
-        return redirect(url_for('authorize'))
     
     try:
         classroom_service = build('classroom', 'v1', credentials=credentials)
@@ -338,7 +313,6 @@ def dashboard():
                     'status': 'Not submitted'
                 }
                 
-                # Check submission status
                 submissions = classroom_service.courses().courseWork().studentSubmissions().list(
                     courseId=course['id'],
                     courseWorkId=work['id'],
@@ -373,13 +347,11 @@ def logout():
     return redirect(url_for('index'))
 
 @app.route('/submit/<assignment_id>', methods=['POST'])
+@login_required
+@limiter.limit("5/minute")
 def submit_assignment_manually(assignment_id):
-    if 'credentials' not in session:
-        return jsonify({'success': False, 'message': 'Not authenticated'})
-
+    logger.info(f"Attempting to submit assignment {assignment_id}")
     credentials = get_credentials()
-    if not credentials:
-        return jsonify({'success': False, 'message': 'Invalid credentials'})
 
     classroom_service = build('classroom', 'v1', credentials=credentials)
     drive_service = build('drive', 'v3', credentials=credentials)
@@ -395,7 +367,6 @@ def submit_assignment_manually(assignment_id):
         course_id = None
         course_work_id = None
         
-        # Find the correct course and coursework IDs
         courses = classroom_service.courses().list(pageSize=10).execute()
         for course in courses.get('courses', []):
             course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
@@ -410,7 +381,6 @@ def submit_assignment_manually(assignment_id):
         if not course_id or not course_work_id:
             return jsonify({'success': False, 'message': 'Assignment not found'})
         
-        # Submit the assignment
         student_submissions = classroom_service.courses().courseWork().studentSubmissions().list(
             courseId=course_id,
             courseWorkId=course_work_id,
@@ -422,12 +392,9 @@ def submit_assignment_manually(assignment_id):
 
         student_submission = student_submissions[0]
 
-        # Create a new file in Google Drive
         file_metadata = {'name': secure_filename(file.filename)}
         media = MediaIoBaseUpload(io.BytesIO(file_content), mimetype='text/plain', resumable=True)
         file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-
-        # Attach the file
         attachment = classroom_service.courses().courseWork().studentSubmissions().modifyAttachments(
             courseId=course_id,
             courseWorkId=course_work_id,
@@ -441,13 +408,13 @@ def submit_assignment_manually(assignment_id):
             }
         ).execute()
 
-        # Turn in the assignment
         classroom_service.courses().courseWork().studentSubmissions().turnIn(
             courseId=course_id,
             courseWorkId=course_work_id,
             id=student_submission['id']
         ).execute()
 
+        logger.info(f"Assignment {assignment_id} submitted successfully")
         return jsonify({'success': True, 'message': 'Assignment submitted successfully'})
     except HttpError as e:
         error_details = json.loads(e.content.decode('utf-8'))
@@ -455,27 +422,26 @@ def submit_assignment_manually(assignment_id):
         logger.error(f"HTTP Error {e.resp.status}: {error_message}")
         return jsonify({'success': False, 'message': f"Error submitting assignment: {error_message}"})
     except Exception as e:
-        logger.error(f"Error submitting assignment manually: {str(e)}")
-        return jsonify({'success': False, 'message': f'Error submitting assignment: {str(e)}'})
+        logger.error(f"Unexpected error submitting assignment {assignment_id}: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'message': f'Unexpected error submitting assignment: {str(e)}'})
 
 @app.route('/revoke')
+@login_required
 def revoke():
-    if 'credentials' in session:
-        credentials = Credentials(**session['credentials'])
-        revoke = requests.post('https://oauth2.googleapis.com/revoke',
-            params={'token': credentials.token},
-            headers = {'content-type': 'application/x-www-form-urlencoded'})
-        status_code = getattr(revoke, 'status_code')
-        if status_code == 200:
-            return redirect(url_for('authorize'))
+    credentials = Credentials(**session['credentials'])
+    revoke = requests.post('https://oauth2.googleapis.com/revoke',
+        params={'token': credentials.token},
+        headers = {'content-type': 'application/x-www-form-urlencoded'})
+    status_code = getattr(revoke, 'status_code')
+    if status_code == 200:
+        return redirect(url_for('authorize'))
     return redirect(url_for('index'))
 
 @app.route('/assignments')
+@login_required
+@cache.cached(timeout=300)
 def assignments():
-    credentials = refresh_credentials()
-    if not credentials:
-        return redirect(url_for('authorize'))
-    
+    credentials = get_credentials()
     classroom_service = build('classroom', 'v1', credentials=credentials)
     
     try:
@@ -501,10 +467,10 @@ def assignments():
         return redirect(url_for('error_page', message="Failed to load assignments"))
 
 @app.route('/courses')
+@login_required
+@cache.cached(timeout=300)
 def courses():
-    credentials = refresh_credentials()
-    if not credentials:
-        return redirect(url_for('authorize'))
+    credentials = get_credentials()
     
     try:
         classroom_service = build('classroom', 'v1', credentials=credentials)
@@ -515,10 +481,10 @@ def courses():
         return redirect(url_for('error_page', message="Failed to load courses"))
 
 @app.route('/profile')
+@login_required
+@cache.cached(timeout=300)
 def profile():
-    credentials = refresh_credentials()
-    if not credentials:
-        return redirect(url_for('authorize'))
+    credentials = get_credentials()
     
     try:
         user_info_service = build('oauth2', 'v2', credentials=credentials)
@@ -529,109 +495,86 @@ def profile():
         return redirect(url_for('error_page', message="Failed to load user profile"))
 
 @app.route('/settings', methods=['GET', 'POST'])
+@login_required
 def settings():
-    if 'credentials' not in session:
-        return redirect(url_for('authorize'))
-
-    credentials = Credentials(**session['credentials'])
+    credentials = get_credentials()
     user_info_service = build('oauth2', 'v2', credentials=credentials)
     user_info = user_info_service.userinfo().get().execute()
 
     if request.method == 'POST':
-        # Handle form submission
         email_notifications = 'email_notifications' in request.form
         github_token = request.form.get('github_token')
+        custom_setting = request.form.get('custom_setting')
 
-        # Update the settings in the configuration
+        user = User.query.filter_by(email=user_info['email']).first()
+        if not user:
+            user = User(email=user_info['email'])
+            db.session.add(user)
+
+        user.settings = {
+            'email_notifications': email_notifications,
+            'github_token': github_token,
+            'custom_setting': custom_setting
+        }
+        db.session.commit()
+
         app.config['EMAIL_NOTIFICATIONS'] = email_notifications
         app.config['GITHUB_TOKEN'] = github_token
-
-        settings = {
-            'email_notifications': email_notifications,
-            'github_token': github_token
-        }
-        with open('user_settings.json', 'w') as f:
-            json.dump(settings, f)
 
         flash('Settings updated successfully', 'success')
         return redirect(url_for('settings'))
 
-    # For GET requests, load the current settings
-    try:
-        with open('user_settings.json', 'r') as f:
-            user_settings = json.load(f)
-    except FileNotFoundError:
-        user_settings = {
-            'email_notifications': False,
-            'github_token': ''
-        }
+    user = User.query.filter_by(email=user_info['email']).first()
+    user_settings = user.settings if user else {}
 
     return render_template('settings.html', user_settings=user_settings, user_info=user_info)
 
 @app.route('/update_settings', methods=['POST'])
+@login_required
+@limiter.limit("5/minute")
 def update_settings():
-    if 'credentials' not in session:
-        return redirect(url_for('authorize'))
-
-    credentials = Credentials(**session['credentials'])
+    credentials = get_credentials()
     user_info_service = build('oauth2', 'v2', credentials=credentials)
     user_info = user_info_service.userinfo().get().execute()
-    user_id = user_info['id']
 
-    # Get form data
     email_notifications = 'email_notifications' in request.form
     github_token = request.form.get('github_token')
     custom_setting = request.form.get('custom_setting')
 
-    # Update settings
-    user_settings = {
+    user = User.query.filter_by(email=user_info['email']).first()
+    if not user:
+        user = User(email=user_info['email'])
+        db.session.add(user)
+
+    user.settings = {
         'email_notifications': email_notifications,
         'github_token': github_token,
         'custom_setting': custom_setting
     }
+    db.session.commit()
 
-    # Save settings to a file (in production, use a database)
-    settings_file = f'user_settings_{user_id}.json'
-    with open(settings_file, 'w') as f:
-        json.dump(user_settings, f)
-
-    # Update application config
     app.config['EMAIL_NOTIFICATIONS'] = email_notifications
     app.config['GITHUB_TOKEN'] = github_token
-
-    # If you're using environment variables, you might want to update them as well
-    os.environ['GITHUB_TOKEN'] = github_token
 
     flash('Settings updated successfully', 'success')
     return redirect(url_for('settings'))
 
-def check_permission(permissions, required_permission):
-    if isinstance(permissions, list):
-        return required_permission in permissions
-    elif isinstance(permissions, dict):
-        return permissions.get(required_permission, False)
-    else:
-        return False
-
 @app.route('/check_user_permission')
+@login_required
+@cache.cached(timeout=300)
 def check_user_permission():
-    if 'credentials' not in session:
-        return jsonify({'status': 'Not authenticated'})
-
-    credentials = Credentials(**session['credentials'])
+    credentials = get_credentials()
     classroom_service = build('classroom', 'v1', credentials=credentials)
 
     try:
         user_id = 'me'
         user_profile = classroom_service.userProfiles().get(userId=user_id).execute()
         
-        # Get permissions from user profile
         permissions = user_profile.get('permissions', [])
 
-        # Check for specific permissions
-        has_create_course_permission = check_permission(permissions, 'CREATE_COURSE')
-        has_view_course_permission = check_permission(permissions, 'VIEW_COURSE')
-        has_manage_course_permission = check_permission(permissions, 'MANAGE_COURSE')
+        has_create_course_permission = 'CREATE_COURSE' in permissions
+        has_view_course_permission = 'VIEW_COURSE' in permissions
+        has_manage_course_permission = 'MANAGE_COURSE' in permissions
 
         return jsonify({
             'user_id': user_id,
@@ -642,6 +585,73 @@ def check_user_permission():
     except Exception as e:
         logger.error(f"Error checking permissions: {str(e)}")
         return jsonify({'success': False, 'message': f"Error checking permissions: {str(e)}"})
+
+@app.route('/analytics')
+@login_required
+@cache.cached(timeout=300)
+def analytics():
+    credentials = get_credentials()
+    classroom_service = build('classroom', 'v1', credentials=credentials)
+
+    try:
+        courses = classroom_service.courses().list(pageSize=10).execute().get('courses', [])
+        analytics_data = []
+
+        for course in courses:
+            course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute().get('courseWork', [])
+            total_assignments = len(course_work)
+            submitted_assignments = 0
+
+            for work in course_work:
+                submissions = classroom_service.courses().courseWork().studentSubmissions().list(
+                    courseId=course['id'],
+                    courseWorkId=work['id'],
+                    userId='me'
+                ).execute().get('studentSubmissions', [])
+                
+                if submissions and submissions[0]['state'] == 'TURNED_IN':
+                    submitted_assignments += 1
+
+            completion_rate = (submitted_assignments / total_assignments) * 100 if total_assignments > 0 else 0
+
+            analytics_data.append({
+                'course_name': course['name'],
+                'total_assignments': total_assignments,
+                'submitted_assignments': submitted_assignments,
+                'completion_rate': round(completion_rate, 2)
+            })
+
+        return render_template('analytics.html', analytics_data=analytics_data)
+    except Exception as e:
+        logger.error(f"Error fetching analytics: {str(e)}")
+        return redirect(url_for('error_page', message="Failed to load analytics"))
+
+@app.route('/create_course', methods=['GET', 'POST'])
+@login_required
+@limiter.limit("3/hour")
+def create_course():
+    if request.method == 'POST':
+        credentials = get_credentials()
+        classroom_service = build('classroom', 'v1', credentials=credentials)
+
+        course = {
+            'name': request.form.get('name'),
+            'section': request.form.get('section'),
+            'descriptionHeading': request.form.get('description_heading'),
+            'description': request.form.get('description'),
+            'room': request.form.get('room'),
+            'ownerId': 'me'
+        }
+
+        try:
+            course = classroom_service.courses().create(body=course).execute()
+            flash(f'Course "{course["name"]}" created successfully!', 'success')
+            return redirect(url_for('courses'))
+        except Exception as e:
+            logger.error(f"Error creating course: {str(e)}")
+            flash('Failed to create course. Please try again.', 'error')
+
+    return render_template('create_course.html')
 
 @app.errorhandler(RefreshError)
 def handle_refresh_error(e):
@@ -656,33 +666,5 @@ def page_not_found(e):
 def internal_server_error(e):
     return render_template('500.html'), 500
 
-def list_classroom_permissions():
-    # Obtain default credentials
-    creds, _ = default()
-    service = build('classroom', 'v1', credentials=creds)
-
-    try:
-        # Get the authenticated user's profile
-        profile = service.userProfiles().get(userId='me').execute()
-        print("User Profile:", profile)
-        
-        # Check permissions on a sample request
-        try:
-            results = service.courses().list(pageSize=10).execute()
-            courses = results.get('courses', [])
-            if not courses:
-                print('No courses found.')
-            else:
-                print('Courses:')
-                for course in courses:
-                    print(course['name'])
-                    
-        except Exception as e:
-            print(f"Permissions Error: {e}")
-        
-    except Exception as e:
-        print(f"API Error: {e}")
-
 if __name__ == '__main__':
     app.run(debug=True, ssl_context='adhoc')
-    app.run(debug=True)
