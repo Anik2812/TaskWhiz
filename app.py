@@ -596,10 +596,13 @@ def analytics():
     try:
         courses = classroom_service.courses().list(pageSize=10).execute().get('courses', [])
         analytics_data = []
+        total_assignments = 0
+        total_submitted = 0
+        submission_timeline = {}
 
         for course in courses:
             course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute().get('courseWork', [])
-            total_assignments = len(course_work)
+            course_assignments = len(course_work)
             submitted_assignments = 0
 
             for work in course_work:
@@ -611,17 +614,35 @@ def analytics():
                 
                 if submissions and submissions[0]['state'] == 'TURNED_IN':
                     submitted_assignments += 1
+                    submission_date = submissions[0]['updateTime'][:10]  # YYYY-MM-DD
+                    submission_timeline[submission_date] = submission_timeline.get(submission_date, 0) + 1
 
-            completion_rate = (submitted_assignments / total_assignments) * 100 if total_assignments > 0 else 0
+            completion_rate = (submitted_assignments / course_assignments) * 100 if course_assignments > 0 else 0
 
             analytics_data.append({
                 'course_name': course['name'],
-                'total_assignments': total_assignments,
+                'total_assignments': course_assignments,
                 'submitted_assignments': submitted_assignments,
                 'completion_rate': round(completion_rate, 2)
             })
 
-        return render_template('analytics.html', analytics_data=analytics_data)
+            total_assignments += course_assignments
+            total_submitted += submitted_assignments
+
+        overall_completion_rate = (total_submitted / total_assignments) * 100 if total_assignments > 0 else 0
+
+        # Sort the submission timeline and get the last 30 days
+        sorted_timeline = sorted(submission_timeline.items())[-30:]
+        submission_dates = [date for date, _ in sorted_timeline]
+        submission_counts = [count for _, count in sorted_timeline]
+
+        return render_template('analytics.html', 
+                               analytics_data=analytics_data,
+                               overall_completion_rate=round(overall_completion_rate, 2),
+                               total_courses=len(courses),
+                               total_assignments=total_assignments,
+                               submission_timeline=submission_dates,
+                               submission_counts=submission_counts)
     except Exception as e:
         logger.error(f"Error fetching analytics: {str(e)}")
         return redirect(url_for('error_page', message="Failed to load analytics"))

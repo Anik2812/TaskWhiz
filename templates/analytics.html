@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="analytics-container">
+    <h1 class="fade-in">Your Analytics</h1>
+    <div class="analytics-summary">
+        <div class="summary-card">
+            <h3>Overall Completion Rate</h3>
+            <p>{{ overall_completion_rate }}%</p>
+        </div>
+        <div class="summary-card">
+            <h3>Total Courses</h3>
+            <p>{{ total_courses }}</p>
+        </div>
+        <div class="summary-card">
+            <h3>Total Assignments</h3>
+            <p>{{ total_assignments }}</p>
+        </div>
+    </div>
+    <div class="chart-container fade-in">
+        <h2>Course Completion Rates</h2>
+        <canvas id="courseCompletionChart"></canvas>
+    </div>
+    <div class="chart-container fade-in">
+        <h2>Assignment Submission Timeline</h2>
+        <canvas id="submissionTimelineChart"></canvas>
+    </div>
+    <div class="analytics-table fade-in">
+        <h2>Course Details</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Course Name</th>
+                    <th>Total Assignments</th>
+                    <th>Completed Assignments</th>
+                    <th>Completion Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for course in analytics_data %}
+                <tr>
+                    <td>{{ course.course_name }}</td>
+                    <td>{{ course.total_assignments }}</td>
+                    <td>{{ course.submitted_assignments }}</td>
+                    <td>{{ course.completion_rate }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}
