@@ -36,6 +36,12 @@
             </div>
             <button class="submit-btn" data-assignment-id="{{ assignment.id }}">Submit Assignment</button>
             {% endif %}
+            <button class="toggle-details">Show Details</button>
+            <div class="assignment-details" style="display: none;">
+                <p><strong>Description:</strong> {{ assignment.description }}</p>
+                <p><strong>Created:</strong> {{ assignment.created_date }}</p>
+                <p><strong>Last Modified:</strong> {{ assignment.last_modified }}</p>
+            </div>
         </div>
         {% endfor %}
     </div>

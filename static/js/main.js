@@ -6,19 +6,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingSpinner = document.getElementById('loading');
     
     // Theme toggle functionality
-    if (themeToggle) {
-        themeToggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.body.classList.toggle('dark-theme');
-            const icon = this.querySelector('i');
-            if (icon.classList.contains('fa-moon')) {
-                icon.classList.replace('fa-moon', 'fa-sun');
-            } else {
-                icon.classList.replace('fa-sun', 'fa-moon');
-            }
-            // Save the theme preference
-            localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
-        });
+    function setupThemeToggle() {
+        if (themeToggle) {
+            themeToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.body.classList.toggle('dark-theme');
+                const icon = this.querySelector('i');
+                if (icon.classList.contains('fa-moon')) {
+                    icon.classList.replace('fa-moon', 'fa-sun');
+                } else {
+                    icon.classList.replace('fa-sun', 'fa-moon');
+                }
+                // Save the theme preference
+                localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
+            });
+        }
     }
 
     function applyTheme() {
@@ -31,8 +33,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
-
-    
 
     // Assignment card hover effect
     assignmentCards.forEach(card => {
@@ -146,10 +146,88 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => console.error('Error checking auth status:', error));
     }
     
-    setInterval(checkAuthStatus, 5 * 60 * 1000);
-    
-    document.addEventListener('DOMContentLoaded', checkAuthStatus);
+    // Toggle assignment details
+    const toggleDetailsBtns = document.querySelectorAll('.toggle-details');
+    toggleDetailsBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const details = this.nextElementSibling;
+            if (details.style.display === 'none') {
+                details.style.display = 'block';
+                this.textContent = 'Hide Details';
+            } else {
+                details.style.display = 'none';
+                this.textContent = 'Show Details';
+            }
+        });
+    });
 
+    // Course details toggle
+    const courseToggleDetailsBtns = document.querySelectorAll('.course .toggle-details');
+    courseToggleDetailsBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const details = this.closest('.course').querySelector('.course-details');
+            if (details.style.display === 'none') {
+                details.style.display = 'block';
+                this.textContent = 'Less Details';
+            } else {
+                details.style.display = 'none';
+                this.textContent = 'More Details';
+            }
+        });
+    });
+
+    // Settings page: Show/Hide GitHub token
+    const showGithubTokenBtn = document.getElementById('show-github-token');
+    if (showGithubTokenBtn) {
+        showGithubTokenBtn.addEventListener('click', function() {
+            const githubTokenInput = document.getElementById('github_token');
+            if (githubTokenInput.type === 'password') {
+                githubTokenInput.type = 'text';
+                this.textContent = 'Hide';
+            } else {
+                githubTokenInput.type = 'password';
+                this.textContent = 'Show';
+            }
+        });
+    }
+
+    // Delete account functionality
+    const deleteAccountBtn = document.getElementById('delete-account');
+    const deleteAccountModal = document.getElementById('delete-account-modal');
+    const confirmDeleteBtn = document.getElementById('confirm-delete');
+    const cancelDeleteBtn = document.getElementById('cancel-delete');
+
+    if (deleteAccountBtn && deleteAccountModal) {
+        deleteAccountBtn.addEventListener('click', () => {
+            deleteAccountModal.style.display = 'block';
+        });
+
+        cancelDeleteBtn.addEventListener('click', () => {
+            deleteAccountModal.style.display = 'none';
+        });
+
+        confirmDeleteBtn.addEventListener('click', () => {
+            // Add your account deletion logic here
+            console.log('Account deletion confirmed');
+            deleteAccountModal.style.display = 'none';
+        });
+    }
+
+    // Initialize components
     setupThemeToggle();
     applyTheme();
+    setInterval(checkAuthStatus, 5 * 60 * 1000);
+    checkAuthStatus();
+
+    // Populate time zone options
+    const timeZoneSelect = document.getElementById('time_zone');
+    if (timeZoneSelect) {
+        const timeZones = moment.tz.names();
+        timeZones.forEach(zone => {
+            const option = document.createElement('option');
+            option.value = zone;
+            option.textContent = zone;
+            timeZoneSelect.appendChild(option);
+        });
+    }
 });

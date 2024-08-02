@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Create Course{% endblock %}
+
+{% block content %}
+<div class="create-course-container">
+    <h1 class="fade-in">Create New Course</h1>
+    <form method="POST" action="{{ url_for('create_course') }}" class="create-course-form fade-in">
+        <div class="form-group">
+            <label for="name">Course Name:</label>
+            <input type="text" id="name" name="name" required>
+        </div>
+        <div class="form-group">
+            <label for="section">Section:</label>
+            <input type="text" id="section" name="section">
+        </div>
+        <div class="form-group">
+            <label for="description_heading">Description Heading:</label>
+            <input type="text" id="description_heading" name="description_heading">
+        </div>
+        <div class="form-group">
+            <label for="description">Description:</label>
+            <textarea id="description" name="description" rows="4"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="room">Room:</label>
+            <input type="text" id="room" name="room">
+        </div>
+        <button type="submit" class="btn btn-primary">Create Course</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/create_course.js') }}"></script>
+{% endblock %}
