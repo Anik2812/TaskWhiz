@@ -499,7 +499,8 @@ def assignments():
         return render_template('assignments.html', assignments=all_assignments)
     except Exception as e:
         logger.error(f"Error fetching assignments: {str(e)}")
-        return redirect(url_for('error_page', message="Failed to load assignments"))
+        flash("Failed to load assignments. Please try again later.", "error")
+        return redirect(url_for('dashboard'))
 
 @app.route('/courses')
 @login_required
@@ -513,7 +514,8 @@ def courses():
         return render_template('courses.html', courses=courses.get('courses', []))
     except Exception as e:
         logger.error(f"Error fetching courses: {str(e)}")
-        return redirect(url_for('error_page', message="Failed to load courses"))
+        flash("Failed to load courses. Please try again later.", "error")
+        return redirect(url_for('dashboard'))
 
 @app.route('/profile')
 @login_required
