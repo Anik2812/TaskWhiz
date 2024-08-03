@@ -32,6 +32,7 @@
             <p class="assignment-due-date"><i class="far fa-clock"></i> Due: {{ assignment.due_date }}</p>
             <p class="assignment-description">{{ assignment.description }}</p>
             <p class="assignment-status status-{{ assignment.status.lower().replace(' ', '-') }}">{{ assignment.status }}</p>
+            <p class="assignment-grade"><i class="fas fa-star"></i> Grade: {{ assignment.grade }} / {{ assignment.total_marks }}</p>
             <a href="{{ url_for('dashboard') }}#{{ assignment.id }}" class="btn">View Details</a>
         </div>
         {% endfor %}

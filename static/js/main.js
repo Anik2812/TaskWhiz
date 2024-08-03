@@ -109,10 +109,19 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function updateAssignmentStatus(assignmentId, status) {
-        const statusElement = document.querySelector(`.assignment[data-id="${assignmentId}"] .assignment-status`);
-        if (statusElement) {
+        const assignmentCard = document.querySelector(`.assignment[data-id="${assignmentId}"]`);
+        if (assignmentCard) {
+            const statusElement = assignmentCard.querySelector('.assignment-status');
+            const submitButton = assignmentCard.querySelector('.submit-btn');
+            const fileUpload = assignmentCard.querySelector('.file-upload');
+    
             statusElement.textContent = status;
             statusElement.className = `assignment-status status-${status.toLowerCase().replace(' ', '-')}`;
+    
+            if (status === 'Submitted') {
+                if (submitButton) submitButton.style.display = 'none';
+                if (fileUpload) fileUpload.style.display = 'none';
+            }
         }
     }
 

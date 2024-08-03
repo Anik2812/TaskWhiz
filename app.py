@@ -310,49 +310,65 @@ def credentials_to_dict(credentials):
 @login_required
 @cache.cached(timeout=60)
 def dashboard():
-    credentials = get_credentials()
+    if 'credentials' not in session:
+        return redirect('authorize')
     
-    try:
-        classroom_service = build('classroom', 'v1', credentials=credentials)
-        github_client = Github(app.config['GITHUB_TOKEN'])
-        
-        repo = github_client.get_repo(app.config['GITHUB_REPO'])
-        courses = classroom_service.courses().list(pageSize=10).execute()
-        assignments = []
+    credentials = Credentials(**session['credentials'])
+    classroom_service = build('classroom', 'v1', credentials=credentials)
+    
+    courses = classroom_service.courses().list(pageSize=10).execute().get('courses', [])
+    assignments = []
 
-        for course in courses.get('courses', []):
-            course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
-            for work in course_work.get('courseWork', []):
-                due_date = parse_due_date(work.get('dueDate', {}))
-                assignment = {
-                    'id': work['id'],
-                    'title': work['title'],
-                    'course': course['name'],
-                    'due_date': due_date.strftime('%Y-%m-%d') if due_date else 'No due date',
-                    'status': 'Not submitted'
-                }
-                
-                submissions = classroom_service.courses().courseWork().studentSubmissions().list(
-                    courseId=course['id'],
-                    courseWorkId=work['id'],
-                    userId='me'
-                ).execute().get('studentSubmissions', [])
-                
-                if submissions and submissions[0]['state'] == 'TURNED_IN':
-                    assignment['status'] = 'Submitted'
-                else:
-                    try:
-                        repo.get_contents(f"{work['title']}/submission.txt")
-                        assignment['status'] = 'Ready to submit'
-                    except GithubException:
-                        pass
-                
-                assignments.append(assignment)
+    for course in courses:
+        course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute().get('courseWork', [])
         
-        return render_template('dashboard.html', assignments=assignments)
-    except Exception as e:
-        logger.error(f"Error in dashboard: {str(e)}", exc_info=True)
-        return redirect(url_for('error_page', message="Failed to load dashboard"))
+        for work in course_work:
+            # Fetch the submission status for this assignment
+            submissions = classroom_service.courses().courseWork().studentSubmissions().list(
+                courseId=course['id'],
+                courseWorkId=work['id'],
+                userId='me'
+            ).execute().get('studentSubmissions', [])
+
+            submission_status = 'Not submitted'
+            if submissions:
+                state = submissions[0]['state']
+                if state == 'TURNED_IN':
+                    submission_status = 'Submitted'
+                elif state == 'RETURNED':
+                    submission_status = 'Graded'
+
+            due_date = work.get('dueDate')
+            if due_date:
+                due_date = datetime(year=due_date['year'], month=due_date['month'], day=due_date['day'])
+            
+            assignment = {
+                'id': work['id'],
+                'title': work['title'],
+                'course': course['name'],
+                'due_date': due_date.strftime('%Y-%m-%d') if due_date else 'No due date',
+                'status': submission_status,
+                'description': work.get('description', 'No description available'),
+                'created_date': work['creationTime'],
+                'last_modified': work['updateTime']
+            }
+
+            # If the assignment is graded, include the grade
+            if submission_status == 'Graded' and 'assignedGrade' in submissions[0]:
+                assignment['grade'] = submissions[0]['assignedGrade']
+                assignment['total_marks'] = work.get('maxPoints', 'N/A')
+
+            assignments.append(assignment)
+
+    total_assignments = len(assignments)
+    completed_assignments = sum(1 for a in assignments if a['status'] in ['Submitted', 'Graded'])
+    upcoming_deadlines = sum(1 for a in assignments if a['due_date'] != 'No due date' and datetime.strptime(a['due_date'], '%Y-%m-%d') > datetime.now())
+
+    return render_template('dashboard.html', 
+                           total_assignments=total_assignments,
+                           completed_assignments=completed_assignments,
+                           upcoming_deadlines=upcoming_deadlines,
+                           assignments=assignments)
 
 @app.route('/error')
 def error_page():

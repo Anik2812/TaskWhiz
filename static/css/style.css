@@ -1224,3 +1224,13 @@ textarea:focus {
 .feature p {
   color: var(--text-light);
 }
+
+.assignment-grade {
+  margin-top: 0.5rem;
+  font-weight: bold;
+  color: var(--primary-color);
+}
+
+.assignment-grade i {
+  margin-right: 0.3rem;
+}
