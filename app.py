@@ -487,16 +487,38 @@ def assignments():
             course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
             for work in course_work.get('courseWork', []):
                 due_date = parse_due_date(work.get('dueDate', {}))
+                
+                # Fetch submission status
+                submissions = classroom_service.courses().courseWork().studentSubmissions().list(
+                    courseId=course['id'],
+                    courseWorkId=work['id'],
+                    userId='me'
+                ).execute().get('studentSubmissions', [])
+                
+                status = 'Not Submitted'
+                grade = None
+                if submissions:
+                    state = submissions[0]['state']
+                    if state == 'TURNED_IN':
+                        status = 'Submitted'
+                    elif state == 'RETURNED':
+                        status = 'Graded'
+                        grade = submissions[0].get('assignedGrade')
+
                 assignment = {
                     'id': work['id'],
                     'title': work['title'],
                     'course': course['name'],
                     'due_date': due_date.strftime('%Y-%m-%d') if due_date else 'No due date',
-                    'description': work.get('description', 'No description available')
+                    'description': work.get('description', 'No description available'),
+                    'status': status,
+                    'grade': grade,
+                    'total_marks': work.get('maxPoints', 'N/A')
                 }
                 all_assignments.append(assignment)
         
-        return render_template('assignments.html', assignments=all_assignments)
+        logger.info(f"Fetched {len(all_assignments)} assignments successfully")
+        return render_template('assignments.html', assignments=all_assignments, courses=courses.get('courses', []))
     except Exception as e:
         logger.error(f"Error fetching assignments: {str(e)}")
         flash("Failed to load assignments. Please try again later.", "error")

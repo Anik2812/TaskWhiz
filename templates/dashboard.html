@@ -28,49 +28,45 @@
     </div>
     <h2 class="section-title"><i class="fas fa-tasks"></i> Recent Assignments</h2>
 
-    <!-- Adding a for loop for the assignments -->
-    {% for assignment in assignments %}
-    <div class="assignment" data-id="{{ assignment.id }}">
-        <div class="assignment-header">
-            <h3><i class="fas fa-file-alt"></i> {{ assignment.title }}</h3>
-            <span class="assignment-status status-{{ assignment.status.lower().replace(' ', '-') }}">
-                <i class="fas fa-circle"></i>
-                {% if assignment.grade is defined and assignment.grade is not none %}
-                Graded
-                {% else %}
-                {{ assignment.status }}
-                {% endif %}
-            </span>
-        </div>
-        <p class="assignment-course"><i class="fas fa-chalkboard-teacher"></i> {{ assignment.course }}</p>
-        <p class="assignment-due-date"><i class="far fa-clock"></i> Due: {{ assignment.due_date }}</p>
-        {% if assignment.grade is defined and assignment.grade is not none %}
-        <p class="assignment-grade">
-            <i class="fas fa-star"></i> Grade: {{ assignment.grade }} / {{ assignment.total_marks }}
-        </p>
-        {% if assignment.status.lower() != 'graded' %}
-        <div class="file-upload">
-            <label for="file-{{ assignment.id }}">
-                <i class="fas fa-upload"></i> Choose File
-            </label>
-            <input type="file" id="file-{{ assignment.id }}" class="file-input"
-                data-assignment-id="{{ assignment.id }}">
-        </div>
-        <button class="submit-btn" data-assignment-id="{{ assignment.id }}"><i class="fas fa-paper-plane"></i> Submit
-            Assignment</button>
-        {% endif %}
-        {% endif %}
-        <button class="toggle-details"><i class="fas fa-chevron-down"></i> Show Details</button>
-        <div class="assignment-details" style="display: none;">
-            <p><strong>Description:</strong> {{ assignment.description | default('No description available', true) }}
+    <div class="assignments-grid">
+        {% for assignment in assignments %}
+        <div class="assignment-card" data-id="{{ assignment.id }}">
+            <div class="assignment-header">
+                <h3 class="assignment-title"><i class="fas fa-file-alt"></i> {{ assignment.title }}</h3>
+                <span class="assignment-status status-{{ assignment.status.lower().replace(' ', '-') }}">
+                    {{ assignment.status }}
+                </span>
+            </div>
+            <p class="assignment-course"><i class="fas fa-chalkboard-teacher"></i> {{ assignment.course }}</p>
+            <p class="assignment-due-date"><i class="far fa-clock"></i> Due: {{ assignment.due_date }}</p>
+            {% if assignment.grade is defined and assignment.grade is not none %}
+            <p class="assignment-grade">
+                <i class="fas fa-star"></i> Grade: {{ assignment.grade }} / {{ assignment.total_marks }}
             </p>
-            <p><strong>Created:</strong> {{ assignment.created_date | default('N/A', true) }}</p>
-            <p><strong>Last Modified:</strong> {{ assignment.last_modified | default('N/A', true) }}</p>
-            <p><strong>Grade:</strong> {{ assignment.grade | default('Not graded', true) }} / {{ assignment.total_marks
-                | default('N/A', true) }}</p>
+            {% endif %}
+            {% if assignment.status.lower() == 'not submitted' %}
+            <div class="file-upload">
+                <label for="file-{{ assignment.id }}">
+                    <i class="fas fa-upload"></i> Choose File
+                </label>
+                <input type="file" id="file-{{ assignment.id }}" class="file-input" data-assignment-id="{{ assignment.id }}">
+            </div>
+            <button class="btn-primary submit-btn" data-assignment-id="{{ assignment.id }}">
+                <i class="fas fa-paper-plane"></i> Submit Assignment
+            </button>
+            {% else %}
+            <button class="btn-primary open-assignment">Open Assignment</button>
+            {% endif %}
+            <button class="toggle-details"><i class="fas fa-chevron-down"></i> Show Details</button>
+            <div class="assignment-details" style="display: none;">
+                <p><strong>Description:</strong> {{ assignment.description | default('No description available', true) }}</p>
+                <p><strong>Created:</strong> {{ assignment.created_date | default('N/A', true) }}</p>
+                <p><strong>Last Modified:</strong> {{ assignment.last_modified | default('N/A', true) }}</p>
+                <p><strong>Grade:</strong> {{ assignment.grade | default('Not graded', true) }} / {{ assignment.total_marks | default('N/A', true) }}</p>
+            </div>
         </div>
+        {% endfor %}
     </div>
-    {% endfor %}
 
     <a href="{{ url_for('assignments') }}" class="btn btn-primary"><i class="fas fa-list"></i> View All Assignments</a>
 </div>

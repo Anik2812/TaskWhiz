@@ -872,26 +872,24 @@ textarea:focus {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
 }
 
 .page-title {
+  grid-column: 1 / -1;
   font-size: 2.5rem;
   color: var(--primary-color);
   margin-bottom: 2rem;
-  display: flex;
-  align-items: center;
-}
-
-.page-title i {
-  margin-right: 1rem;
-  font-size: 2rem;
 }
 
 .dashboard-summary {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1.5rem;
-  margin-bottom: 3rem;
+  margin-bottom: 2rem;
 }
 
 .summary-card {
@@ -927,15 +925,10 @@ textarea:focus {
 }
 
 .section-title {
+  grid-column: 1 / -1;
   font-size: 1.8rem;
   color: var(--primary-color);
   margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-}
-
-.section-title i {
-  margin-right: 0.5rem;
 }
 
 #assignments {
@@ -961,6 +954,26 @@ textarea:focus {
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
 }
 
+.assignments-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.assignment-card {
+  background-color: var(--card-background);
+  border-radius: 15px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+}
+
+.assignment-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
 .assignment-header {
   display: flex;
   justify-content: space-between;
@@ -968,7 +981,7 @@ textarea:focus {
   margin-bottom: 1rem;
 }
 
-.assignment-header h3 {
+.assignment-title {
   margin: 0;
   color: var(--primary-color);
   font-size: 1.3rem;
@@ -989,11 +1002,6 @@ textarea:focus {
   color: var(--text-color);
 }
 
-.assignment-status i {
-  margin-right: 0.3rem;
-  font-size: 0.8rem;
-}
-
 .status-submitted {
   background-color: #c3e6cb;
   color: #155724;
@@ -1002,7 +1010,18 @@ textarea:focus {
 .status-graded {
   background-color: #b8daff;
   color: #004085;
-  animation: pulse 2s infinite;
+}
+
+.assignment-course,
+.assignment-due-date {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  margin-bottom: 0.5rem;
+}
+
+.btn-primary {
+  grid-column: 1 / -1;
+  justify-self: start;
 }
 
 @keyframes pulse {
@@ -1015,13 +1034,6 @@ textarea:focus {
   100% {
       box-shadow: 0 0 0 0 rgba(0, 64, 133, 0);
   }
-}
-
-.assignment-course,
-.assignment-due-date {
-  font-size: 0.9rem;
-  color: var(--text-light);
-  margin-bottom: 0.5rem;
 }
 
 .assignment-course i,
@@ -1275,4 +1287,12 @@ textarea:focus {
 
 .assignment-grade i {
   margin-right: 0.3rem;
+}
+
+.fas, .far {
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
 }
