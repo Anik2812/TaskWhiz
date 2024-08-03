@@ -592,3 +592,116 @@ body.dark-theme {
   margin-right: 1rem;
 }
 
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 3rem;
+}
+
+.pagination button {
+  background-color: var(--primary-color);
+  color: #fff;
+  border: none;
+  padding: 0.8rem 1.2rem;
+  margin: 0 0.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.pagination button:hover {
+  background-color: var(--primary-light);
+}
+
+.pagination button:disabled {
+  background-color: var(--text-light);
+  cursor: not-allowed;
+}
+
+/* Analytics styles */
+.analytics-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.analytics-summary {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3rem;
+}
+
+.summary-card {
+  background-color: var(--card-background);
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: var(--shadow);
+  flex: 1;
+  margin: 0 1rem;
+  text-align: center;
+  transition: var(--transition);
+}
+
+.summary-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+}
+
+.summary-card h3 {
+  color: var(--primary-color);
+  margin-bottom: 1rem;
+}
+
+.summary-card p {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.analytics-charts {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3rem;
+}
+
+.chart-container {
+  background-color: var(--card-background);
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: var(--shadow);
+  flex: 1;
+  margin: 0 1rem;
+}
+
+.analytics-table {
+  background-color: var(--card-background);
+  border-radius: 15px;
+  padding: 2rem;
+  box-shadow: var(--shadow);
+}
+
+.analytics-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.analytics-table th,
+.analytics-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--text-light);
+}
+
+.analytics-table th {
+  background-color: var(--primary-color);
+  color: #fff;
+}
+
+/* Improved transitions and effects */
+.assignment,
+.course,
+.profile-card,
+.settings-form,
+.summary-card,
+.chart-container {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
