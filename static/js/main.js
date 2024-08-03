@@ -176,19 +176,22 @@ document.addEventListener('DOMContentLoaded', function () {
     // Toggle assignment details
     const toggleDetailsBtns = document.querySelectorAll('.toggle-details');
     toggleDetailsBtns.forEach(btn => {
-        button.addEventListener('click', function () {
+        btn.addEventListener('click', function() {
             const details = this.nextElementSibling;
-            details.style.display = details.style.display === 'none' ? 'block' : 'none';
-            this.innerHTML = details.style.display === 'none' ?
-                '<i class="fas fa-chevron-down"></i> Show Details' :
-                '<i class="fas fa-chevron-up"></i> Hide Details';
+            if (details.style.display === 'none') {
+                details.style.display = 'block';
+                this.textContent = 'Hide Details';
+            } else {
+                details.style.display = 'none';
+                this.textContent = 'Show Details';
+            }
         });
     });
 
     // Course details toggle
     const courseToggleDetailsBtns = document.querySelectorAll('.course .toggle-details');
     courseToggleDetailsBtns.forEach(btn => {
-        btn.addEventListener('click', function () {
+        btn.addEventListener('click', function() {
             const details = this.closest('.course').querySelector('.course-details');
             if (details.style.display === 'none') {
                 details.style.display = 'block';
@@ -199,6 +202,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
 
     // Settings page: Show/Hide GitHub token
     const showGithubTokenBtn = document.getElementById('show-github-token');

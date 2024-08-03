@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="assignments-container">
-    <h1 class="page-title">All Assignments</h1>
+    <h1 class="page-title"><i class="fas fa-tasks"></i> All Assignments</h1>
 
     <div class="search-filter">
         <select id="course-filter">
@@ -18,11 +18,6 @@
             <option value="Not Submitted">Not Submitted</option>
             <option value="Submitted">Submitted</option>
             <option value="Graded">Graded</option>
-            {% if assignment.status.lower() != 'not submitted' %}
-            <button class="btn-primary open-assignment">
-                <i class="fas fa-folder-open"></i> Open Assignment
-            </button>
-            {% endif %}
         </select>
         <select id="sort-filter">
             <option value="due_date_asc">Due Date (Ascending)</option>
@@ -38,16 +33,30 @@
             <h2>{{ assignment.title }}</h2>
             <p class="assignment-course"><i class="fas fa-chalkboard-teacher"></i> {{ assignment.course }}</p>
             <p class="assignment-due-date"><i class="far fa-clock"></i> Due: {{ assignment.due_date }}</p>
-            <p class="assignment-description">{{ assignment.description }}</p>
             <p class="assignment-status status-{{ assignment.status.lower().replace(' ', '-') }}">
                 {{ assignment.status }}
             </p>
             {% if assignment.grade is not none %}
             <p class="assignment-grade">
-                Grade: {{ assignment.grade }} / {{ assignment.total_marks }}
+                <i class="fas fa-star"></i> Grade: {{ assignment.grade }} / {{ assignment.total_marks }}
             </p>
             {% endif %}
             <button class="btn-primary view-details">View Details</button>
+            {% if assignment.status.lower() == 'not submitted' %}
+            <div class="file-upload">
+                <label for="file-{{ assignment.id }}">
+                    <i class="fas fa-upload"></i> Choose File
+                </label>
+                <input type="file" id="file-{{ assignment.id }}" class="file-input" data-assignment-id="{{ assignment.id }}">
+            </div>
+            <button class="btn-primary submit-btn" data-assignment-id="{{ assignment.id }}">
+                <i class="fas fa-paper-plane"></i> Submit Assignment
+            </button>
+            {% elif assignment.status.lower() != 'not submitted' %}
+            <button class="btn-primary open-assignment">
+                <i class="fas fa-folder-open"></i> Open Assignment
+            </button>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -60,5 +69,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="../static/js/main.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}
