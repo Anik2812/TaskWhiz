@@ -18,6 +18,11 @@
             <option value="Not Submitted">Not Submitted</option>
             <option value="Submitted">Submitted</option>
             <option value="Graded">Graded</option>
+            {% if assignment.status.lower() != 'not submitted' %}
+            <button class="btn-primary open-assignment">
+                <i class="fas fa-folder-open"></i> Open Assignment
+            </button>
+            {% endif %}
         </select>
         <select id="sort-filter">
             <option value="due_date_asc">Due Date (Ascending)</option>
@@ -27,7 +32,7 @@
         </select>
     </div>
 
-    <div id="assignments-grid">
+    <div id="assignments-grid" class="assignments-grid">
         {% for assignment in assignments %}
         <div class="assignment-card">
             <h2>{{ assignment.title }}</h2>

@@ -49,20 +49,27 @@
                 <label for="file-{{ assignment.id }}">
                     <i class="fas fa-upload"></i> Choose File
                 </label>
-                <input type="file" id="file-{{ assignment.id }}" class="file-input" data-assignment-id="{{ assignment.id }}">
+                <input type="file" id="file-{{ assignment.id }}" class="file-input"
+                    data-assignment-id="{{ assignment.id }}">
             </div>
             <button class="btn-primary submit-btn" data-assignment-id="{{ assignment.id }}">
                 <i class="fas fa-paper-plane"></i> Submit Assignment
             </button>
             {% else %}
-            <button class="btn-primary open-assignment">Open Assignment</button>
+            {% if assignment.status.lower() != 'not submitted' %}
+            <button class="btn-primary open-assignment">
+                <i class="fas fa-folder-open"></i> Open Assignment
+            </button>
+            {% endif %}
             {% endif %}
             <button class="toggle-details"><i class="fas fa-chevron-down"></i> Show Details</button>
             <div class="assignment-details" style="display: none;">
-                <p><strong>Description:</strong> {{ assignment.description | default('No description available', true) }}</p>
+                <p><strong>Description:</strong> {{ assignment.description | default('No description available', true)
+                    }}</p>
                 <p><strong>Created:</strong> {{ assignment.created_date | default('N/A', true) }}</p>
                 <p><strong>Last Modified:</strong> {{ assignment.last_modified | default('N/A', true) }}</p>
-                <p><strong>Grade:</strong> {{ assignment.grade | default('Not graded', true) }} / {{ assignment.total_marks | default('N/A', true) }}</p>
+                <p><strong>Grade:</strong> {{ assignment.grade | default('Not graded', true) }} / {{
+                    assignment.total_marks | default('N/A', true) }}</p>
             </div>
         </div>
         {% endfor %}

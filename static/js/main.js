@@ -1,14 +1,14 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const assignmentCards = document.querySelectorAll('.assignment');
     const fileInputs = document.querySelectorAll('.file-input');
     const submitButtons = document.querySelectorAll('.submit-btn');
     const themeToggle = document.getElementById('theme-toggle');
     const loadingSpinner = document.getElementById('loading');
-    
+
     // Theme toggle functionality
     function setupThemeToggle() {
         if (themeToggle) {
-            themeToggle.addEventListener('click', function(e) {
+            themeToggle.addEventListener('click', function (e) {
                 e.preventDefault();
                 document.body.classList.toggle('dark-theme');
                 const icon = this.querySelector('i');
@@ -37,18 +37,18 @@ document.addEventListener('DOMContentLoaded', function() {
     function showLoadingSpinner() {
         document.getElementById('loading').style.display = 'flex';
     }
-    
+
     function hideLoadingSpinner() {
         document.getElementById('loading').style.display = 'none';
     }
 
     // Assignment card hover effect
     assignmentCards.forEach(card => {
-        card.addEventListener('mouseenter', function() {
+        card.addEventListener('mouseenter', function () {
             this.style.transform = 'scale(1.05)';
             this.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.2)';
         });
-        card.addEventListener('mouseleave', function() {
+        card.addEventListener('mouseleave', function () {
             this.style.transform = 'scale(1)';
             this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
         });
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // File input change event
     fileInputs.forEach(input => {
-        input.addEventListener('change', function(e) {
+        input.addEventListener('change', function (e) {
             const fileName = e.target.files[0].name;
             const assignmentId = this.dataset.assignmentId;
             const label = document.querySelector(`label[for="file-${assignmentId}"]`);
@@ -69,18 +69,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Submit button click event
     submitButtons.forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             const assignmentId = this.dataset.assignmentId;
             const fileInput = document.getElementById(`file-${assignmentId}`);
-           
+
             if (!fileInput || fileInput.files.length === 0) {
                 showNotification('Please select a file to upload.', 'error');
                 return;
             }
-    
+
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
-    
+
             if (loadingSpinner) {
                 loadingSpinner.style.display = 'block';
             }
@@ -90,21 +90,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
-            .then(data => {
-                hideLoadingSpinner();
-                if (data.success) {
-                    showNotification('Assignment submitted successfully!', 'success');
-                    updateAssignmentStatus(assignmentId, 'Submitted');
-                } else {
-                    showNotification(data.message || 'Error submitting assignment. Please try again.', 'error');
-                }
-            })
-            .catch(error => {
-                hideLoadingSpinner();
-                console.error('Error:', error);
-                showNotification('An error occurred. Please try again.', 'error');
-            });
+                .then(response => response.json())
+                .then(data => {
+                    hideLoadingSpinner();
+                    if (data.success) {
+                        showNotification('Assignment submitted successfully!', 'success');
+                        updateAssignmentStatus(assignmentId, 'Submitted');
+                    } else {
+                        showNotification(data.message || 'Error submitting assignment. Please try again.', 'error');
+                    }
+                })
+                .catch(error => {
+                    hideLoadingSpinner();
+                    console.error('Error:', error);
+                    showNotification('An error occurred. Please try again.', 'error');
+                });
         });
     });
 
@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const statusElement = assignmentCard.querySelector('.assignment-status');
             const submitButton = assignmentCard.querySelector('.submit-btn');
             const fileUpload = assignmentCard.querySelector('.file-upload');
-    
+
             if (grade !== null) {
                 status = 'Graded';
                 const gradeElement = assignmentCard.querySelector('.assignment-grade');
@@ -127,10 +127,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     assignmentCard.insertBefore(newGradeElement, submitButton || fileUpload);
                 }
             }
-    
+
             statusElement.innerHTML = `<i class="fas fa-circle"></i> ${status}`;
             statusElement.className = `assignment-status status-${status.toLowerCase().replace(' ', '-')}`;
-    
+
             if (status === 'Submitted' || status === 'Graded') {
                 if (submitButton) submitButton.style.display = 'none';
                 if (fileUpload) fileUpload.style.display = 'none';
@@ -144,16 +144,16 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Notification container not found');
             return;
         }
-    
+
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         notification.textContent = message;
         notificationContainer.appendChild(notification);
-    
+
         setTimeout(() => {
             notification.classList.add('show');
         }, 100);
-    
+
         setTimeout(() => {
             notification.classList.remove('show');
             setTimeout(() => {
@@ -172,26 +172,23 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => console.error('Error checking auth status:', error));
     }
-    
+
     // Toggle assignment details
     const toggleDetailsBtns = document.querySelectorAll('.toggle-details');
     toggleDetailsBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             const details = this.nextElementSibling;
-            if (details.style.display === 'none') {
-                details.style.display = 'block';
-                this.textContent = 'Hide Details';
-            } else {
-                details.style.display = 'none';
-                this.textContent = 'Show Details';
-            }
+            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+            this.innerHTML = details.style.display === 'none' ?
+                '<i class="fas fa-chevron-down"></i> Show Details' :
+                '<i class="fas fa-chevron-up"></i> Hide Details';
         });
     });
 
     // Course details toggle
     const courseToggleDetailsBtns = document.querySelectorAll('.course .toggle-details');
     courseToggleDetailsBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             const details = this.closest('.course').querySelector('.course-details');
             if (details.style.display === 'none') {
                 details.style.display = 'block';
@@ -206,7 +203,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Settings page: Show/Hide GitHub token
     const showGithubTokenBtn = document.getElementById('show-github-token');
     if (showGithubTokenBtn) {
-        showGithubTokenBtn.addEventListener('click', function() {
+        showGithubTokenBtn.addEventListener('click', function () {
             const githubTokenInput = document.getElementById('github_token');
             if (githubTokenInput.type === 'password') {
                 githubTokenInput.type = 'text';
