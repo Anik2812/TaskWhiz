@@ -34,6 +34,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function showLoadingSpinner() {
+        document.getElementById('loading').style.display = 'flex';
+    }
+    
+    function hideLoadingSpinner() {
+        document.getElementById('loading').style.display = 'none';
+    }
+
     // Assignment card hover effect
     assignmentCards.forEach(card => {
         card.addEventListener('mouseenter', function() {
@@ -76,16 +84,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (loadingSpinner) {
                 loadingSpinner.style.display = 'block';
             }
-    
+            showLoadingSpinner();
+
             fetch(`/submit/${assignmentId}`, {
                 method: 'POST',
                 body: formData
             })
             .then(response => response.json())
             .then(data => {
-                if (loadingSpinner) {
-                    loadingSpinner.style.display = 'none';
-                }
+                hideLoadingSpinner();
                 if (data.success) {
                     showNotification('Assignment submitted successfully!', 'success');
                     updateAssignmentStatus(assignmentId, 'Submitted');
@@ -94,9 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
-                if (loadingSpinner) {
-                    loadingSpinner.style.display = 'none';
-                }
+                hideLoadingSpinner();
                 console.error('Error:', error);
                 showNotification('An error occurred. Please try again.', 'error');
             });

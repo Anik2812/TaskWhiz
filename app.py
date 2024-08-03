@@ -39,14 +39,20 @@ logger = logging.getLogger(__name__)
 from config import Config
 
 app = Flask(__name__, static_url_path='/static')
+csp = {
+    'default-src': ['\'self\'', 'https://fonts.googleapis.com', 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com'],
+    'script-src': ['\'self\'', 'https://cdnjs.cloudflare.com', '\'unsafe-inline\''],
+    'style-src': ['\'self\'', 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com', '\'unsafe-inline\''],
+    'font-src': ['\'self\'', 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com'],
+}
+
+Talisman(app, content_security_policy=csp)
+
 app.config.from_object(Config)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
 
 # Enable CORS
 CORS(app)
-
-# Enable security headers
-Talisman(app)
 
 # Setup caching
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
