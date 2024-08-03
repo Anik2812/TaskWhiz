@@ -645,31 +645,61 @@ body.dark-theme {
   margin-bottom: 3rem;
 }
 
+.dashboard-summary {
+  color: white;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
 .summary-card {
-  background-color: var(--card-background);
+  background: var(--gradient-primary);
   color: white;
   border-radius: 15px;
   padding: 2rem;
-  box-shadow: var(--shadow);
-  flex: 1;
-  margin: 0 1rem;
   text-align: center;
-  transition: var(--transition);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
 
 .summary-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.summary-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(45deg);
+  z-index: 0;
+}
+
+.summary-card i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  position: relative;
+  z-index: 1;
 }
 
 .summary-card h3 {
-  color: white;
-  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  position: relative;
+  z-index: 1;
 }
 
 .summary-card p {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 2.5rem;
+  font-weight: bold;
+  position: relative;
+  z-index: 1;
 }
 
 .analytics-charts {
@@ -857,10 +887,9 @@ textarea:focus {
 }
 
 .dashboard-summary {
-  color: white;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
   margin-bottom: 3rem;
 }
 
@@ -868,7 +897,7 @@ textarea:focus {
   background: var(--gradient-primary);
   color: white;
   border-radius: 15px;
-  padding: 2rem;
+  padding: 1.5rem;
   text-align: center;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   position: relative;
@@ -880,37 +909,20 @@ textarea:focus {
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
 }
 
-.summary-card::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: rgba(255, 255, 255, 0.1);
-  transform: rotate(45deg);
-  z-index: 0;
-}
-
 .summary-card i {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  position: relative;
-  z-index: 1;
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .summary-card h3 {
-  font-size: 1.2rem;
+  font-size: 1rem;
   margin-bottom: 0.5rem;
-  position: relative;
-  z-index: 1;
+  opacity: 0.8;
 }
 
 .summary-card p {
-  font-size: 2.5rem;
+  font-size: 1.8rem;
   font-weight: bold;
-  position: relative;
-  z-index: 1;
 }
 
 .section-title {
@@ -958,11 +970,13 @@ textarea:focus {
 }
 
 .assignment-status {
-  font-size: 0.9rem;
-  padding: 0.3rem 0.8rem;
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
   border-radius: 20px;
-  display: flex;
-  align-items: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .assignment-status i {
@@ -978,6 +992,24 @@ textarea:focus {
 .status-submitted {
   background-color: #c3e6cb;
   color: #155724;
+}
+
+.status-graded {
+  background-color: #b8daff;
+  color: #004085;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+      box-shadow: 0 0 0 0 rgba(0, 64, 133, 0.4);
+  }
+  70% {
+      box-shadow: 0 0 0 10px rgba(0, 64, 133, 0);
+  }
+  100% {
+      box-shadow: 0 0 0 0 rgba(0, 64, 133, 0);
+  }
 }
 
 .assignment-course,

@@ -108,17 +108,30 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    function updateAssignmentStatus(assignmentId, status) {
+    function updateAssignmentStatus(assignmentId, status, grade = null) {
         const assignmentCard = document.querySelector(`.assignment[data-id="${assignmentId}"]`);
         if (assignmentCard) {
             const statusElement = assignmentCard.querySelector('.assignment-status');
             const submitButton = assignmentCard.querySelector('.submit-btn');
             const fileUpload = assignmentCard.querySelector('.file-upload');
     
-            statusElement.textContent = status;
+            if (grade !== null) {
+                status = 'Graded';
+                const gradeElement = assignmentCard.querySelector('.assignment-grade');
+                if (gradeElement) {
+                    gradeElement.textContent = `Grade: ${grade}`;
+                } else {
+                    const newGradeElement = document.createElement('p');
+                    newGradeElement.className = 'assignment-grade';
+                    newGradeElement.innerHTML = `<i class="fas fa-star"></i> Grade: ${grade}`;
+                    assignmentCard.insertBefore(newGradeElement, submitButton || fileUpload);
+                }
+            }
+    
+            statusElement.innerHTML = `<i class="fas fa-circle"></i> ${status}`;
             statusElement.className = `assignment-status status-${status.toLowerCase().replace(' ', '-')}`;
     
-            if (status === 'Submitted') {
+            if (status === 'Submitted' || status === 'Graded') {
                 if (submitButton) submitButton.style.display = 'none';
                 if (fileUpload) fileUpload.style.display = 'none';
             }
