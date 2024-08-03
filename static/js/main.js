@@ -4,6 +4,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const submitButtons = document.querySelectorAll('.submit-btn');
     const themeToggle = document.getElementById('theme-toggle');
     const loadingSpinner = document.getElementById('loading');
+    const courseFilter = document.getElementById('course-filter');
+    const statusFilter = document.getElementById('status-filter');
+    const sortFilter = document.getElementById('sort-filter');
+    const assignmentsGrid = document.getElementById('assignments-grid');
 
     // Theme toggle functionality
     function setupThemeToggle() {
@@ -176,7 +180,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Toggle assignment details
     const toggleDetailsBtns = document.querySelectorAll('.toggle-details');
     toggleDetailsBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             const details = this.nextElementSibling;
             if (details.style.display === 'none') {
                 details.style.display = 'block';
@@ -191,7 +195,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Course details toggle
     const courseToggleDetailsBtns = document.querySelectorAll('.course .toggle-details');
     courseToggleDetailsBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             const details = this.closest('.course').querySelector('.course-details');
             if (details.style.display === 'none') {
                 details.style.display = 'block';
@@ -241,7 +245,50 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function applyFiltersAndSort() {
+        const assignments = Array.from(assignmentsGrid.children);
+        const courseValue = courseFilter.value.toLowerCase();
+        const statusValue = statusFilter.value.toLowerCase();
+        const sortValue = sortFilter.value;
+
+        assignments.forEach(assignment => {
+            const course = assignment.querySelector('.assignment-course').textContent.toLowerCase();
+            const status = assignment.querySelector('.assignment-status').textContent.toLowerCase();
+
+            const courseMatch = courseValue === '' || course.includes(courseValue);
+            const statusMatch = statusValue === '' || status.includes(statusValue);
+
+            assignment.style.display = courseMatch && statusMatch ? 'block' : 'none';
+        });
+
+        const visibleAssignments = assignments.filter(a => a.style.display !== 'none');
+
+        visibleAssignments.sort((a, b) => {
+            switch (sortValue) {
+                case 'due_date_asc':
+                    return new Date(a.querySelector('.assignment-due-date').textContent.split('Due: ')[1]) -
+                        new Date(b.querySelector('.assignment-due-date').textContent.split('Due: ')[1]);
+                case 'due_date_desc':
+                    return new Date(b.querySelector('.assignment-due-date').textContent.split('Due: ')[1]) -
+                        new Date(a.querySelector('.assignment-due-date').textContent.split('Due: ')[1]);
+                case 'title_asc':
+                    return a.querySelector('h2').textContent.localeCompare(b.querySelector('h2').textContent);
+                case 'title_desc':
+                    return b.querySelector('h2').textContent.localeCompare(a.querySelector('h2').textContent);
+                default:
+                    return 0;
+            }
+        });
+
+        visibleAssignments.forEach(assignment => assignmentsGrid.appendChild(assignment));
+    }
+
+    courseFilter.addEventListener('change', applyFiltersAndSort);
+    statusFilter.addEventListener('change', applyFiltersAndSort);
+    sortFilter.addEventListener('change', applyFiltersAndSort);
+
     // Initialize components
+    applyFiltersAndSort();
     setupThemeToggle();
     applyTheme();
     setInterval(checkAuthStatus, 5 * 60 * 1000);
