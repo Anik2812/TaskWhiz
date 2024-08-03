@@ -840,3 +840,162 @@ textarea:focus {
   font-size: 2rem;
 }
 
+.dashboard-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.summary-card {
+  background: var(--gradient-primary);
+  color: white;
+  border-radius: 15px;
+  padding: 2rem;
+  text-align: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.summary-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.summary-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(45deg);
+  z-index: 0;
+}
+
+.summary-card i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  position: relative;
+  z-index: 1;
+}
+
+.summary-card h3 {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.summary-card p {
+  font-size: 2.5rem;
+  font-weight: bold;
+  position: relative;
+  z-index: 1;
+}
+
+.section-title {
+  font-size: 1.8rem;
+  color: var(--primary-color);
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.section-title i {
+  margin-right: 0.5rem;
+}
+
+#assignments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.assignment {
+  background-color: var(--card-background);
+  border-radius: 15px;
+  padding: 1.5rem;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.assignment:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
+.assignment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.assignment-header h3 {
+  font-size: 1.3rem;
+  color: var(--primary-color);
+  margin: 0;
+}
+
+.assignment-status {
+  font-size: 0.9rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.assignment-status i {
+  margin-right: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.status-not-submitted {
+  background-color: #ffeeba;
+  color: #856404;
+}
+
+.status-submitted {
+  background-color: #c3e6cb;
+  color: #155724;
+}
+
+.assignment-course,
+.assignment-due-date {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.assignment-course i,
+.assignment-due-date i {
+  margin-right: 0.5rem;
+}
+
+.file-upload {
+  margin-top: 1rem;
+}
+
+.file-upload label {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.file-upload label:hover {
+  background-color: var(--primary-dark);
+}
+
+.file-upload input[type="file"] {
+  display: none;
+}
+
