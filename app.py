@@ -29,6 +29,9 @@ from flask_cors import CORS
 from flask_talisman import Talisman
 from flask_login import LoginManager, current_user
 from flask_login import UserMixin
+from flask_login import logout_user
+
+
 
 
 
@@ -71,6 +74,33 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     settings = db.Column(db.JSON)
+    assignments = db.relationship('Assignment', backref='user', lazy=True)
+    courses = db.relationship('Course', backref='user', lazy=True)
+
+# Assignment model
+class Assignment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    due_date = db.Column(db.DateTime)
+    status = db.Column(db.String(20))
+    file_url = db.Column(db.String(200))
+    grade = db.Column(db.Float)
+    total_marks = db.Column(db.Float)
+    feedback = db.Column(db.Text)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+
+# Course model
+class Course(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    assignments = db.relationship('Assignment', backref='course', lazy=True)
+
+# Create tables
+with app.app_context():
+    db.create_all()
 
 # Create tables
 with app.app_context():
@@ -377,8 +407,9 @@ def error_page():
     return render_template('error.html', error_message=error_message)
 
 @app.route('/logout')
+@login_required
 def logout():
-    session.clear()
+    logout_user()
     return redirect(url_for('index'))
 
 @app.route('/submit/<assignment_id>', methods=['POST'])
@@ -755,93 +786,80 @@ def create_course():
 
 @app.route('/analytics')
 @login_required
-@cache.cached(timeout=300)
 def analytics():
-    credentials = get_credentials()
-    classroom_service = build('classroom', 'v1', credentials=credentials)
-
     try:
-        courses = classroom_service.courses().list(pageSize=10).execute().get('courses', [])
-        analytics_data = []
-        total_assignments = 0
-        total_submitted = 0
+        # Check if the current user is authenticated
+        if current_user.is_anonymous:
+            return redirect(url_for('login'))
+
+        # Fetch user-related data
+        courses = Course.query.filter_by(user_id=current_user.id).all()
+        assignments = Assignment.query.filter_by(user_id=current_user.id).all()
+
+        total_courses = len(courses)
+        total_assignments = len(assignments)
+        completed_assignments = sum(1 for a in assignments if a.status in ['Submitted', 'Graded'])
+        overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
+        average_grade = sum(a.grade for a in assignments if a.grade is not None) / sum(1 for a in assignments if a.grade is not None) if any(a.grade is not None for a in assignments) else 0
+
+        # Calculate submission timeline
         submission_timeline = {}
-        grade_distribution = [0, 0, 0, 0, 0]  # A, B, C, D, F
-        workload_distribution = [0, 0, 0, 0, 0, 0, 0]  # Mon to Sun
-        total_grades = 0
-        total_grade_points = 0
+        for assignment in assignments:
+            if assignment.submitted_date:
+                date = assignment.submitted_date.date()
+                submission_timeline[date] = submission_timeline.get(date, 0) + 1
+        
+        submission_dates = sorted(submission_timeline.keys())[-30:]  # Last 30 days
+        submission_counts = [submission_timeline[date] for date in submission_dates]
 
+        # Calculate analytics data for each course
+        analytics_data = []
         for course in courses:
-            course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute().get('courseWork', [])
-            course_assignments = len(course_work)
-            submitted_assignments = 0
-            course_grade_points = 0
-            course_graded_assignments = 0
-
-            for work in course_work:
-                submissions = classroom_service.courses().courseWork().studentSubmissions().list(
-                    courseId=course['id'],
-                    courseWorkId=work['id'],
-                    userId='me'
-                ).execute().get('studentSubmissions', [])
-                
-                if submissions:
-                    submission = submissions[0]
-                    if submission['state'] == 'TURNED_IN':
-                        submitted_assignments += 1
-                        submission_date = datetime.fromisoformat(submission['updateTime'].replace('Z', '+00:00'))
-                        submission_timeline[submission_date.date()] = submission_timeline.get(submission_date.date(), 0) + 1
-                        workload_distribution[submission_date.weekday()] += 1
-
-                    if 'assignedGrade' in submission:
-                        grade = submission['assignedGrade'] / work['maxPoints']
-                        course_grade_points += grade
-                        course_graded_assignments += 1
-                        total_grade_points += grade
-                        total_grades += 1
-                        
-                        if grade >= 0.9:
-                            grade_distribution[0] += 1
-                        elif grade >= 0.8:
-                            grade_distribution[1] += 1
-                        elif grade >= 0.7:
-                            grade_distribution[2] += 1
-                        elif grade >= 0.6:
-                            grade_distribution[3] += 1
-                        else:
-                            grade_distribution[4] += 1
-
-            completion_rate = (submitted_assignments / course_assignments) * 100 if course_assignments > 0 else 0
-            average_grade = (course_grade_points / course_graded_assignments) * 100 if course_graded_assignments > 0 else 0
-
+            course_assignments = [a for a in assignments if a.course_id == course.id]
+            total_course_assignments = len(course_assignments)
+            submitted_course_assignments = sum(1 for a in course_assignments if a.status in ['Submitted', 'Graded'])
+            completion_rate = (submitted_course_assignments / total_course_assignments * 100) if total_course_assignments > 0 else 0
+            average_course_grade = sum(a.grade for a in course_assignments if a.grade is not None) / sum(1 for a in course_assignments if a.grade is not None) if any(a.grade is not None for a in course_assignments) else 0
+            
             analytics_data.append({
-                'course_name': course['name'],
-                'total_assignments': course_assignments,
-                'submitted_assignments': submitted_assignments,
-                'completion_rate': round(completion_rate, 2),
-                'average_grade': average_grade
+                'course_name': course.name,
+                'total_assignments': total_course_assignments,
+                'submitted_assignments': submitted_course_assignments,
+                'completion_rate': completion_rate,
+                'average_grade': average_course_grade
             })
 
-            total_assignments += course_assignments
-            total_submitted += submitted_assignments
+        # Calculate grade distribution
+        grade_distribution = [0, 0, 0, 0, 0]  # A, B, C, D, F
+        for assignment in assignments:
+            if assignment.grade is not None:
+                if assignment.grade >= 90:
+                    grade_distribution[0] += 1
+                elif assignment.grade >= 80:
+                    grade_distribution[1] += 1
+                elif assignment.grade >= 70:
+                    grade_distribution[2] += 1
+                elif assignment.grade >= 60:
+                    grade_distribution[3] += 1
+                else:
+                    grade_distribution[4] += 1
 
-        overall_completion_rate = (total_submitted / total_assignments) * 100 if total_assignments > 0 else 0
-        average_grade = (total_grade_points / total_grades) * 100 if total_grades > 0 else 0
-
-        sorted_timeline = sorted(submission_timeline.items())[-30:]
-        submission_dates = [date.strftime('%Y-%m-%d') for date, _ in sorted_timeline]
-        submission_counts = [count for _, count in sorted_timeline]
+        # Calculate workload distribution
+        workload_distribution = [0] * 7  # Mon to Sun
+        for assignment in assignments:
+            if assignment.due_date:
+                workload_distribution[assignment.due_date.weekday()] += 1
 
         return render_template('analytics.html', 
-                               analytics_data=analytics_data,
-                               overall_completion_rate=round(overall_completion_rate, 2),
-                               average_grade=average_grade,
-                               total_courses=len(courses),
-                               total_assignments=total_assignments,
-                               submission_timeline=submission_dates,
-                               submission_counts=submission_counts,
-                               grade_distribution=grade_distribution,
-                               workload_distribution=workload_distribution)
+                            total_courses=total_courses,
+                            total_assignments=total_assignments,
+                            overall_completion_rate=overall_completion_rate,
+                            average_grade=average_grade,
+                            submission_timeline=submission_dates,
+                            submission_counts=submission_counts,
+                            analytics_data=analytics_data,
+                            grade_distribution=grade_distribution,
+                            workload_distribution=workload_distribution)
     except Exception as e:
         logger.error(f"Error fetching analytics: {str(e)}")
         return redirect(url_for('error_page', message="Failed to load analytics"))
