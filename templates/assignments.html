@@ -1,11 +1,8 @@
 {% extends "base.html" %}
-
 {% block title %}Assignments{% endblock %}
-
 {% block content %}
 <div class="assignments-container">
     <h1 class="page-title"><i class="fas fa-tasks"></i> All Assignments</h1>
-
     <div class="search-filter">
         <div class="filter-group">
             <label for="course-filter">Course:</label>
@@ -35,41 +32,35 @@
             </select>
         </div>
     </div>
-
     <div id="assignments-grid" class="assignments-grid">
         {% for assignment in assignments %}
-        <div class="assignment-card">
+        <div class="assignment-card" data-course="{{ assignment.course }}" data-status="{{ assignment.status }}">
             <h2>{{ assignment.title }}</h2>
             <p class="assignment-course"><i class="fas fa-chalkboard-teacher"></i> {{ assignment.course }}</p>
             <p class="assignment-due-date"><i class="far fa-clock"></i> Due: {{ assignment.due_date }}</p>
             <p class="assignment-status status-{{ assignment.status.lower().replace(' ', '-') }}">
-                {{ assignment.status }}
+                <i class="fas fa-circle"></i> {{ assignment.status }}
             </p>
             {% if assignment.grade is not none %}
             <p class="assignment-grade">
                 <i class="fas fa-star"></i> Grade: <span>{{ assignment.grade }} / {{ assignment.total_marks }}</span>
             </p>
             {% endif %}
-            <div class="assignment-card">
-                <div class="card-actions">
-                <button class="btn-primary view-details">View Details</button>
-                </div>
+            <div class="card-actions">
+                <button class="btn btn-primary view-details" data-assignment-id="{{ assignment.id }}">
+                    <i class="fas fa-eye"></i> View Details
+                </button>
                 {% if assignment.status.lower() == 'not submitted' %}
-                <div class="file-upload">
-                    <label for="file-{{ assignment.id }}">
-                        <div class="card-actions">
-                        <i class="fas fa-upload"></i> Choose File
-                        </div>
-                    </label>
-                    <input type="file" id="file-{{ assignment.id }}" class="file-input" data-assignment-id="{{ assignment.id }}">
-                </div>
-                <button class="btn-secondary submit-btn" data-assignment-id="{{ assignment.id }}">
-                    <div class="card-actions">
+                <label for="file-{{ assignment.id }}" class="btn btn-secondary">
+                    <i class="fas fa-upload"></i> Choose File
+                </label>
+                <input type="file" id="file-{{ assignment.id }}" class="file-input"
+                    data-assignment-id="{{ assignment.id }}" style="display: none;">
+                <button class="btn btn-primary submit-btn" data-assignment-id="{{ assignment.id }}">
                     <i class="fas fa-paper-plane"></i> Submit
-                    </div>
                 </button>
                 {% elif assignment.status.lower() != 'not submitted' %}
-                <button class="btn-secondary open-assignment">
+                <button class="btn btn-secondary open-assignment" data-assignment-id="{{ assignment.id }}">
                     <i class="fas fa-folder-open"></i> Open
                 </button>
                 {% endif %}
@@ -77,14 +68,105 @@
         </div>
         {% endfor %}
     </div>
-
     <div class="pagination">
-        <button id="prev-page" disabled>Previous</button>
-        <button id="next-page">Next</button>
+        <button id="prev-page" class="btn btn-secondary" disabled>Previous</button>
+        <button id="next-page" class="btn btn-secondary">Next</button>
     </div>
 </div>
-{% endblock %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const assignmentsGrid = document.getElementById('assignments-grid');
+        const courseFilter = document.getElementById('course-filter');
+        const statusFilter = document.getElementById('status-filter');
+        const sortFilter = document.getElementById('sort-filter');
 
-{% block scripts %}
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+        // View Details button
+        document.querySelectorAll('.view-details').forEach(button => {
+            button.addEventListener('click', function () {
+                const assignmentId = this.getAttribute('data-assignment-id');
+                // Implement your view details logic here, e.g., open a modal or navigate to a details page
+                alert(`Viewing details for assignment ${assignmentId}`);
+            });
+        });
+
+        // Submit button
+        document.querySelectorAll('.submit-btn').forEach(button => {
+            button.addEventListener('click', function () {
+                const assignmentId = this.getAttribute('data-assignment-id');
+                const fileInput = document.getElementById(`file-${assignmentId}`);
+                if (fileInput.files.length > 0) {
+                    // Implement your submit logic here
+                    alert(`Submitting assignment ${assignmentId}`);
+                    // Update the assignment status after successful submission
+                    this.closest('.assignment-card').querySelector('.assignment-status').innerHTML = '<i class="fas fa-circle"></i> Submitted';
+                    this.closest('.assignment-card').dataset.status = 'Submitted';
+                    // Hide submit button and file input after submission
+                    this.style.display = 'none';
+                    fileInput.closest('label').style.display = 'none';
+                } else {
+                    alert('Please choose a file before submitting.');
+                }
+            });
+        });
+
+        // Open Assignment button
+        document.querySelectorAll('.open-assignment').forEach(button => {
+            button.addEventListener('click', function () {
+                const assignmentId = this.getAttribute('data-assignment-id');
+                // Implement your open assignment logic here
+                alert(`Opening assignment ${assignmentId}`);
+            });
+        });
+
+        // File input change event
+        document.querySelectorAll('.file-input').forEach(input => {
+            input.addEventListener('change', function () {
+                const fileName = this.files[0].name;
+                this.previousElementSibling.textContent = `Selected: ${fileName}`;
+            });
+        });
+
+        // Filtering and sorting function
+        function filterAndSortAssignments() {
+            const courseValue = courseFilter.value.toLowerCase();
+            const statusValue = statusFilter.value.toLowerCase();
+            const sortValue = sortFilter.value;
+
+            const assignments = Array.from(assignmentsGrid.children);
+
+            assignments.forEach(assignment => {
+                const course = assignment.dataset.course.toLowerCase();
+                const status = assignment.dataset.status.toLowerCase();
+
+                const courseMatch = courseValue === '' || course.includes(courseValue);
+                const statusMatch = statusValue === '' || status === statusValue;
+
+                assignment.style.display = courseMatch && statusMatch ? 'block' : 'none';
+            });
+
+            const visibleAssignments = assignments.filter(a => a.style.display !== 'none');
+
+            visibleAssignments.sort((a, b) => {
+                const aValue = a.querySelector(sortValue.includes('due_date') ? '.assignment-due-date' : 'h2').textContent;
+                const bValue = b.querySelector(sortValue.includes('due_date') ? '.assignment-due-date' : 'h2').textContent;
+
+                if (sortValue.includes('asc')) {
+                    return aValue.localeCompare(bValue);
+                } else {
+                    return bValue.localeCompare(aValue);
+                }
+            });
+
+            visibleAssignments.forEach(assignment => assignmentsGrid.appendChild(assignment));
+        }
+
+        // Add event listeners for filters and sort
+        courseFilter.addEventListener('change', filterAndSortAssignments);
+        statusFilter.addEventListener('change', filterAndSortAssignments);
+        sortFilter.addEventListener('change', filterAndSortAssignments);
+
+        // Initial call to set up the grid
+        filterAndSortAssignments();
+    });
+</script>
 {% endblock %}
