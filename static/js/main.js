@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const showGithubTokenBtn = document.getElementById('show-github-token');
     const deleteAccountBtn = document.getElementById('delete-account');
     const deleteAccountModal = document.getElementById('delete-account-modal');
+    
 
     // Theme toggle functionality
     function setupThemeToggle() {

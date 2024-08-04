@@ -72,14 +72,24 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
 <script>
-    var analyticsData = {
-        submissionTimeline: {{ submission_timeline|tojson|safe }},
-        submissionCounts: {{ submission_counts|tojson|safe }},
-        courseNames: {{ analytics_data|map(attribute='course_name')|list|tojson|safe }},
-        completionRates: {{ analytics_data|map(attribute='completion_rate')|list|tojson|safe }},
-        gradeDistribution: {{ grade_distribution|tojson|safe }},
-        workloadDistribution: {{ workload_distribution|tojson|safe }}
+    var submissionData = {
+        labels: "{{ submission_timeline|tojson|safe }}",
+        counts: "{{ submission_counts|tojson|safe }}"
+    };
+    var completionData = {
+        labels: "{{ analytics_data|map(attribute='course_name')|list|tojson|safe }}",
+        rates: "{{ analytics_data|map(attribute='completion_rate')|list|tojson|safe }}"
+    };
+    var gradeDistributionData = {
+        labels: "{{ grade_distribution|map(attribute='grade')|list|tojson|safe }}",
+        counts: "{{ grade_distribution|map(attribute='count')|list|tojson|safe }}"
+    };
+    var workloadDistributionData = {
+        labels: "{{ workload_distribution|map(attribute='workload')|list|tojson|safe }}",
+        counts: "{{ workload_distribution|map(attribute='count')|list|tojson|safe }}"
     };
 </script>
 {% endblock %}

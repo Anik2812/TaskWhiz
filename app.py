@@ -588,35 +588,35 @@ def settings():
 
     return render_template('settings.html', user_settings=user_settings, user_info=user_info)
 
-@app.route('/update_settings', methods=['POST'])
-@login_required
-@limiter.limit("5/minute")
-def update_settings():
-    credentials = get_credentials()
-    user_info_service = build('oauth2', 'v2', credentials=credentials)
-    user_info = user_info_service.userinfo().get().execute()
+# @app.route('/update_settings', methods=['POST'])
+# @login_required
+# @limiter.limit("5/minute")
+# def update_settings():
+#     credentials = get_credentials()
+#     user_info_service = build('oauth2', 'v2', credentials=credentials)
+#     user_info = user_info_service.userinfo().get().execute()
 
-    email_notifications = 'email_notifications' in request.form
-    github_token = request.form.get('github_token')
-    custom_setting = request.form.get('custom_setting')
+#     email_notifications = 'email_notifications' in request.form
+#     github_token = request.form.get('github_token')
+#     custom_setting = request.form.get('custom_setting')
 
-    user = User.query.filter_by(email=user_info['email']).first()
-    if not user:
-        user = User(email=user_info['email'])
-        db.session.add(user)
+#     user = User.query.filter_by(email=user_info['email']).first()
+#     if not user:
+#         user = User(email=user_info['email'])
+#         db.session.add(user)
 
-    user.settings = {
-        'email_notifications': email_notifications,
-        'github_token': github_token,
-        'custom_setting': custom_setting
-    }
-    db.session.commit()
+#     user.settings = {
+#         'email_notifications': email_notifications,
+#         'github_token': github_token,
+#         'custom_setting': custom_setting
+#     }
+#     db.session.commit()
 
-    app.config['EMAIL_NOTIFICATIONS'] = email_notifications
-    app.config['GITHUB_TOKEN'] = github_token
+#     app.config['EMAIL_NOTIFICATIONS'] = email_notifications
+#     app.config['GITHUB_TOKEN'] = github_token
 
-    flash('Settings updated successfully', 'success')
-    return redirect(url_for('settings'))
+#     flash('Settings updated successfully', 'success')
+#     return redirect(url_for('settings'))
 
 @app.route('/check_user_permission')
 @login_required
@@ -644,6 +644,114 @@ def check_user_permission():
     except Exception as e:
         logger.error(f"Error checking permissions: {str(e)}")
         return jsonify({'success': False, 'message': f"Error checking permissions: {str(e)}"})
+    
+@app.route('/assignment/<int:assignment_id>', methods=['GET'])
+@login_required
+def get_assignment_details(assignment_id):
+    assignment = Assignment.query.get(assignment_id)
+    if assignment and assignment.user_id == current_user.id:
+        return jsonify({
+            'success': True,
+            'assignment': {
+                'id': assignment.id,
+                'title': assignment.title,
+                'course': assignment.course.name,
+                'due_date': assignment.due_date.isoformat(),
+                'status': assignment.status,
+                'description': assignment.description,
+                'file_url': assignment.file_url if assignment.file_url else None,
+                'grade': assignment.grade,
+                'total_marks': assignment.total_marks,
+                'feedback': assignment.feedback
+            }
+        })
+    return jsonify({'success': False, 'message': 'Assignment not found'}), 404
+
+@app.route('/submit_assignment', methods=['POST'])
+@login_required
+def submit_assignment():
+    assignment_id = request.form.get('assignment_id')
+    file = request.files.get('assignment_file')
+    
+    if not assignment_id or not file:
+        return jsonify({'success': False, 'message': 'Missing assignment ID or file'}), 400
+    
+    assignment = Assignment.query.get(assignment_id)
+    if not assignment or assignment.user_id != current_user.id:
+        return jsonify({'success': False, 'message': 'Assignment not found'}), 404
+    
+    if assignment.status != 'Not Submitted':
+        return jsonify({'success': False, 'message': 'Assignment already submitted'}), 400
+    
+    # Save the file
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(file_path)
+    
+    # Update assignment status
+    assignment.status = 'Submitted'
+    assignment.file_url = file_path
+    assignment.submitted_date = datetime.utcnow()
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Assignment submitted successfully', 'assignment_id': assignment.id})
+
+@app.route('/delete_account', methods=['POST'])
+@login_required
+def delete_account():
+    # Remove user's assignments
+    Assignment.query.filter_by(user_id=current_user.id).delete()
+    
+    # Remove user's courses
+    Course.query.filter_by(user_id=current_user.id).delete()
+    
+    # Remove the user
+    db.session.delete(current_user)
+    db.session.commit()
+    
+    logout_user()
+    
+    return jsonify({'success': True, 'message': 'Account deleted successfully'})
+
+@app.route('/update_settings', methods=['POST'])
+@login_required
+def update_settings():
+    github_token = request.form.get('github_token')
+    time_zone = request.form.get('time_zone')
+    
+    current_user.github_token = github_token
+    current_user.time_zone = time_zone
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Settings updated successfully'})
+
+@app.route('/create_course', methods=['POST'])
+@login_required
+def create_course():
+    if request.method == 'POST':
+        credentials = get_credentials()
+        classroom_service = build('classroom', 'v1', credentials=credentials)
+
+        course = {
+            'name': request.form.get('name'),
+            'section': request.form.get('section'),
+            'descriptionHeading': request.form.get('description_heading'),
+            'description': request.form.get('description'),
+            'room': request.form.get('room'),
+            'ownerId': 'me'
+        }
+
+        try:
+            course = classroom_service.courses().create(body=course).execute()
+            flash(f'Course "{course["name"]}" created successfully!', 'success')
+            return redirect(url_for('courses'))
+        except Exception as e:
+            logger.error(f"Error creating course: {str(e)}")
+            flash('Failed to create course. Please try again.', 'error')
+
+    return render_template('create_course.html')
 
 @app.route('/analytics')
 @login_required
@@ -737,33 +845,6 @@ def analytics():
     except Exception as e:
         logger.error(f"Error fetching analytics: {str(e)}")
         return redirect(url_for('error_page', message="Failed to load analytics"))
-
-@app.route('/create_course', methods=['GET', 'POST'])
-@login_required
-@limiter.limit("3/hour")
-def create_course():
-    if request.method == 'POST':
-        credentials = get_credentials()
-        classroom_service = build('classroom', 'v1', credentials=credentials)
-
-        course = {
-            'name': request.form.get('name'),
-            'section': request.form.get('section'),
-            'descriptionHeading': request.form.get('description_heading'),
-            'description': request.form.get('description'),
-            'room': request.form.get('room'),
-            'ownerId': 'me'
-        }
-
-        try:
-            course = classroom_service.courses().create(body=course).execute()
-            flash(f'Course "{course["name"]}" created successfully!', 'success')
-            return redirect(url_for('courses'))
-        except Exception as e:
-            logger.error(f"Error creating course: {str(e)}")
-            flash('Failed to create course. Please try again.', 'error')
-
-    return render_template('create_course.html')
 
 @app.errorhandler(RefreshError)
 def handle_refresh_error(e):
