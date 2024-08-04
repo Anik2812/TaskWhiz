@@ -1,95 +1,67 @@
 {% extends "base.html" %}
 
-{% block title %}Analytics Dashboard{% endblock %}
+{% block title %}Assignments{% endblock %}
 
 {% block content %}
-<div class="analytics-container">
-    <h1 class="fade-in">Analytics Dashboard</h1>
-    <div class="analytics-summary">
-        <div class="summary-card">
-            <h3>Total Courses</h3>
-            <p>{{ total_courses }}</p>
-        </div>
-        <div class="summary-card">
-            <h3>Total Assignments</h3>
-            <p>{{ total_assignments }}</p>
-        </div>
-        <div class="summary-card">
-            <h3>Overall Completion Rate</h3>
-            <p>{{ overall_completion_rate }}%</p>
-        </div>
-        <div class="summary-card">
-            <h3>Avg. Grade</h3>
-            <p>{{ average_grade|round(2) }}</p>
-        </div>
+<div class="assignments-container">
+    <h1 class="fade-in">Assignments</h1>
+    
+    <div class="filters">
+        <select id="course-filter">
+            <option value="">All Courses</option>
+            {% for course in courses %}
+            <option value="{{ course.name }}">{{ course.name }}</option>
+            {% endfor %}
+        </select>
+        <select id="status-filter">
+            <option value="">All Statuses</option>
+            <option value="not submitted">Not Submitted</option>
+            <option value="submitted">Submitted</option>
+            <option value="graded">Graded</option>
+        </select>
+        <select id="sort-filter">
+            <option value="due_date_asc">Due Date (Ascending)</option>
+            <option value="due_date_desc">Due Date (Descending)</option>
+            <option value="title_asc">Title (A-Z)</option>
+            <option value="title_desc">Title (Z-A)</option>
+        </select>
     </div>
-    <div class="analytics-charts">
-        <div class="chart-container">
-            <h2>Submission Timeline</h2>
-            <canvas id="submissionChart"></canvas>
+
+    <div id="assignments-grid">
+        {% for assignment in assignments %}
+        <div class="assignment-card" data-assignment-id="{{ assignment.id }}">
+            <h2>{{ assignment.title }}</h2>
+            <p class="assignment-course">{{ assignment.course }}</p>
+            <p class="assignment-due-date">Due: {{ assignment.due_date }}</p>
+            <p class="assignment-status status-{{ assignment.status|lower|replace(' ', '-') }}">
+                <i class="fas fa-circle"></i> {{ assignment.status }}
+            </p>
+            <div class="card-actions">
+                <button class="btn btn-primary view-details" data-assignment-id="{{ assignment.id }}">
+                    <i class="fas fa-eye"></i> View Details
+                </button>
+                {% if assignment.status == 'Not Submitted' %}
+                <form class="submit-form">
+                    <input type="file" id="file-{{ assignment.id }}" class="file-input" data-assignment-id="{{ assignment.id }}" style="display: none;">
+                    <label for="file-{{ assignment.id }}" class="btn btn-secondary">
+                        <i class="fas fa-file-upload"></i> Choose File
+                    </label>
+                    <button type="submit" class="btn btn-primary submit-btn" data-assignment-id="{{ assignment.id }}">
+                        <i class="fas fa-paper-plane"></i> Submit
+                    </button>
+                </form>
+                {% elif assignment.status == 'Submitted' %}
+                <button class="btn btn-secondary open-assignment" data-assignment-id="{{ assignment.id }}">
+                    <i class="fas fa-folder-open"></i> Open
+                </button>
+                {% endif %}
+            </div>
         </div>
-        <div class="chart-container">
-            <h2>Course Completion Rates</h2>
-            <canvas id="completionChart"></canvas>
-        </div>
-        <div class="chart-container">
-            <h2>Grade Distribution</h2>
-            <canvas id="gradeDistributionChart"></canvas>
-        </div>
-        <div class="chart-container">
-            <h2>Workload Distribution</h2>
-            <canvas id="workloadDistributionChart"></canvas>
-        </div>
-    </div>
-    <div class="analytics-table">
-        <h2>Course Details</h2>
-        <table id="courseDetailsTable">
-            <thead>
-                <tr>
-                    <th>Course Name</th>
-                    <th>Total Assignments</th>
-                    <th>Submitted Assignments</th>
-                    <th>Completion Rate</th>
-                    <th>Average Grade</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for course in analytics_data %}
-                <tr>
-                    <td>{{ course.course_name }}</td>
-                    <td>{{ course.total_assignments }}</td>
-                    <td>{{ course.submitted_assignments }}</td>
-                    <td>{{ course.completion_rate }}%</td>
-                    <td>{{ course.average_grade|round(2) }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        {% endfor %}
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
-
-<script>
-    var submissionData = {
-        labels: "{{ submission_timeline|tojson|safe }}",
-        counts: "{{ submission_counts|tojson|safe }}"
-    };
-    var completionData = {
-        labels: "{{ analytics_data|map(attribute='course_name')|list|tojson|safe }}",
-        rates: "{{ analytics_data|map(attribute='completion_rate')|list|tojson|safe }}"
-    };
-    var gradeDistributionData = {
-        labels: "{{ grade_distribution|map(attribute='grade')|list|tojson|safe }}",
-        counts: "{{ grade_distribution|map(attribute='count')|list|tojson|safe }}"
-    };
-    var workloadDistributionData = {
-        labels: "{{ workload_distribution|map(attribute='workload')|list|tojson|safe }}",
-        counts: "{{ workload_distribution|map(attribute='count')|list|tojson|safe }}"
-    };
-</script>
+<script src="{{ url_for('static', filename='js/assignments.js') }}"></script>
 {% endblock %}

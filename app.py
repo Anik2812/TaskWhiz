@@ -4,8 +4,12 @@ import logging
 import io
 import threading
 import time
-from datetime import datetime, timedelta
-from functools import wraps
+import schedule
+import smtplib
+import requests
+from sqlalchemy import func
+import functools
+from functools import wraps, partial
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from github import Github, GithubException
@@ -511,8 +515,11 @@ def assignments():
     classroom_service = build('classroom', 'v1', credentials=credentials)
     
     try:
-        courses = classroom_service.courses().list(pageSize=10).execute()
+        courses = Course.query.filter_by(user_id=current_user.id).all()
+
         all_assignments = []
+        assignments = Assignment.query.filter_by(user_id=current_user.id).all()
+
 
         for course in courses.get('courses', []):
             course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
@@ -549,9 +556,9 @@ def assignments():
                 all_assignments.append(assignment)
         
         logger.info(f"Fetched {len(all_assignments)} assignments successfully")
-        return render_template('assignments.html', assignments=all_assignments, courses=courses.get('courses', []))
+        return render_template('assignments.html', assignments=assignments, courses=courses)
     except Exception as e:
-        logger.error(f"Error fetching assignments: {str(e)}")
+        logger.error(f"Error in assignments route: {str(e)}", exc_info=True)
         flash("Failed to load assignments. Please try again later.", "error")
         return redirect(url_for('dashboard'))
 
@@ -788,19 +795,12 @@ def create_course():
 @login_required
 def analytics():
     try:
-        # Check if the current user is authenticated
-        if current_user.is_anonymous:
-            return redirect(url_for('login'))
-
-        # Fetch user-related data
-        courses = Course.query.filter_by(user_id=current_user.id).all()
-        assignments = Assignment.query.filter_by(user_id=current_user.id).all()
-
-        total_courses = len(courses)
-        total_assignments = len(assignments)
-        completed_assignments = sum(1 for a in assignments if a.status in ['Submitted', 'Graded'])
+        # Fetch analytics data
+        total_courses = Course.query.filter_by(user_id=current_user.id).count()
+        total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
+        completed_assignments = Assignment.query.filter_by(user_id=current_user.id, status='Submitted').count()
         overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
-        average_grade = sum(a.grade for a in assignments if a.grade is not None) / sum(1 for a in assignments if a.grade is not None) if any(a.grade is not None for a in assignments) else 0
+        average_grade = db.session.query(func.avg(Assignment.grade)).filter(Assignment.user_id == current_user.id, Assignment.grade != None).scalar() or 0
 
         # Calculate submission timeline
         submission_timeline = {}
@@ -850,19 +850,18 @@ def analytics():
             if assignment.due_date:
                 workload_distribution[assignment.due_date.weekday()] += 1
 
-        return render_template('analytics.html', 
-                            total_courses=total_courses,
-                            total_assignments=total_assignments,
-                            overall_completion_rate=overall_completion_rate,
-                            average_grade=average_grade,
-                            submission_timeline=submission_dates,
-                            submission_counts=submission_counts,
-                            analytics_data=analytics_data,
-                            grade_distribution=grade_distribution,
-                            workload_distribution=workload_distribution)
+        chart_data = {}  # Define chart_data variable
+        return render_template('analytics.html',
+                               total_courses=total_courses,
+                               total_assignments=total_assignments,
+                               overall_completion_rate=overall_completion_rate,
+                               average_grade=average_grade,
+                               analytics_data=analytics_data,
+                               analyticsData=json.dumps(chart_data))
     except Exception as e:
-        logger.error(f"Error fetching analytics: {str(e)}")
-        return redirect(url_for('error_page', message="Failed to load analytics"))
+        logger.error(f"Error in analytics route: {str(e)}", exc_info=True)
+        flash("Failed to load analytics. Please try again later.", "error")
+        return redirect(url_for('dashboard'))
 
 @app.errorhandler(RefreshError)
 def handle_refresh_error(e):

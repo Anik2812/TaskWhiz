@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const deleteAccountModal = document.getElementById('delete-account-modal');
     
 
+
     // Theme toggle functionality
     function setupThemeToggle() {
         if (themeToggle) {
