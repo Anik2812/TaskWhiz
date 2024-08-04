@@ -1,13 +1,19 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const assignmentCards = document.querySelectorAll('.assignment');
-    const fileInputs = document.querySelectorAll('.file-input');
-    const submitButtons = document.querySelectorAll('.submit-btn');
+    // Common elements
     const themeToggle = document.getElementById('theme-toggle');
     const loadingSpinner = document.getElementById('loading');
+    const notificationContainer = document.getElementById('notification-container');
+
+    // Page-specific elements
+    const assignmentCards = document.querySelectorAll('.assignment-card');
     const courseFilter = document.getElementById('course-filter');
     const statusFilter = document.getElementById('status-filter');
     const sortFilter = document.getElementById('sort-filter');
     const assignmentsGrid = document.getElementById('assignments-grid');
+    const timeZoneSelect = document.getElementById('time_zone');
+    const showGithubTokenBtn = document.getElementById('show-github-token');
+    const deleteAccountBtn = document.getElementById('delete-account');
+    const deleteAccountModal = document.getElementById('delete-account-modal');
 
     // Theme toggle functionality
     function setupThemeToggle() {
@@ -21,7 +27,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     icon.classList.replace('fa-sun', 'fa-moon');
                 }
-                // Save the theme preference
                 localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
             });
         }
@@ -38,87 +43,94 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Loading spinner functions
     function showLoadingSpinner() {
-        document.getElementById('loading').style.display = 'flex';
+        if (loadingSpinner) loadingSpinner.style.display = 'flex';
     }
 
     function hideLoadingSpinner() {
-        document.getElementById('loading').style.display = 'none';
+        if (loadingSpinner) loadingSpinner.style.display = 'none';
     }
 
-    // Assignment card hover effect
-    assignmentCards.forEach(card => {
-        card.addEventListener('mouseenter', function () {
-            this.style.transform = 'scale(1.05)';
-            this.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.2)';
+    // Notification function
+    function showNotification(message, type) {
+        if (!notificationContainer) {
+            console.error('Notification container not found');
+            return;
+        }
+
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        notificationContainer.appendChild(notification);
+
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }, 3000);
+    }
+
+    // Assignment card functionality
+    if (assignmentCards.length > 0) {
+        assignmentCards.forEach(card => {
+            card.addEventListener('mouseenter', function () {
+                this.style.transform = 'scale(1.05)';
+                this.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.2)';
+            });
+            card.addEventListener('mouseleave', function () {
+                this.style.transform = 'scale(1)';
+                this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+            });
         });
-        card.addEventListener('mouseleave', function () {
-            this.style.transform = 'scale(1)';
-            this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+
+        // View Details functionality
+        document.querySelectorAll('.view-details').forEach(button => {
+            button.addEventListener('click', function() {
+                const assignmentId = this.getAttribute('data-assignment-id');
+                fetchAssignmentDetails(assignmentId);
+            });
         });
-    });
 
-    // File input change event
-    fileInputs.forEach(input => {
-        input.addEventListener('change', function (e) {
-            const fileName = e.target.files[0].name;
-            const assignmentId = this.dataset.assignmentId;
-            const label = document.querySelector(`label[for="file-${assignmentId}"]`);
-            if (label) {
-                label.innerHTML = `<i class="fas fa-file"></i> ${fileName}`;
-                label.classList.add('file-selected');
-            }
+        // Submit Assignment functionality
+        document.querySelectorAll('.submit-form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const assignmentId = this.querySelector('.submit-btn').getAttribute('data-assignment-id');
+                const fileInput = this.querySelector('.file-input');
+
+                if (!fileInput || fileInput.files.length === 0) {
+                    showNotification('Please select a file to upload.', 'error');
+                    return;
+                }
+
+                const formData = new FormData(this);
+                formData.append('assignment_id', assignmentId);
+
+                submitAssignment(formData);
+            });
         });
-    });
 
-    // Submit button click event
-    submitButtons.forEach(button => {
-        button.addEventListener('click', function () {
-            const assignmentId = this.dataset.assignmentId;
-            const fileInput = document.getElementById(`file-${assignmentId}`);
-
-            if (!fileInput || fileInput.files.length === 0) {
-                showNotification('Please select a file to upload.', 'error');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-
-            if (loadingSpinner) {
-                loadingSpinner.style.display = 'block';
-            }
-            showLoadingSpinner();
-
-            fetch(`/submit/${assignmentId}`, {
-                method: 'POST',
-                body: formData
-            })
-                .then(response => response.json())
-                .then(data => {
-                    hideLoadingSpinner();
-                    if (data.success) {
-                        showNotification('Assignment submitted successfully!', 'success');
-                        updateAssignmentStatus(assignmentId, 'Submitted');
-                    } else {
-                        showNotification(data.message || 'Error submitting assignment. Please try again.', 'error');
-                    }
-                })
-                .catch(error => {
-                    hideLoadingSpinner();
-                    console.error('Error:', error);
-                    showNotification('An error occurred. Please try again.', 'error');
-                });
+        // File input change event
+        document.querySelectorAll('.file-input').forEach(input => {
+            input.addEventListener('change', function (e) {
+                const fileName = e.target.files[0].name;
+                const assignmentId = this.dataset.assignmentId;
+                const label = document.querySelector(`label[for="file-${assignmentId}"]`);
+                if (label) {
+                    label.innerHTML = `<i class="fas fa-file"></i> ${fileName}`;
+                    label.classList.add('file-selected');
+                }
+            });
         });
-    });
+    }
 
-    document.querySelectorAll('.view-details').forEach(button => {
-        button.addEventListener('click', function() {
-            const assignmentId = this.getAttribute('data-assignment-id');
-            fetchAssignmentDetails(assignmentId);
-        });
-    });
-
+    // Fetch assignment details
     function fetchAssignmentDetails(assignmentId) {
         showLoadingSpinner();
         fetch(`/assignment/${assignmentId}`)
@@ -138,8 +150,8 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
+    // Display assignment details
     function displayAssignmentDetails(assignment) {
-        // Create modal container if it doesn't exist
         let modal = document.getElementById('assignment-details-modal');
         if (!modal) {
             modal = document.createElement('div');
@@ -148,7 +160,6 @@ document.addEventListener('DOMContentLoaded', function () {
             document.body.appendChild(modal);
         }
     
-        // Create modal content
         const detailsHtml = `
             <div class="modal-content">
                 <span class="close">&times;</span>
@@ -163,58 +174,34 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         `;
     
-        // Set modal content
         modal.innerHTML = detailsHtml;
-    
-        // Display modal
         modal.style.display = 'block';
     
-        // Close modal when clicking on <span> (x)
         const closeSpan = modal.querySelector('.close');
         closeSpan.onclick = function() {
             modal.style.display = 'none';
         }
     
-        // Close modal when clicking outside of it
         window.onclick = function(event) {
             if (event.target == modal) {
                 modal.style.display = 'none';
             }
         }
     
-        // Add escape key listener to close modal
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape' && modal.style.display === 'block') {
                 modal.style.display = 'none';
             }
         });
     }
-    
+
     // Helper function to format date
     function formatDate(dateString) {
         const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
         return new Date(dateString).toLocaleDateString(undefined, options);
     }
 
-    // Submit Assignment functionality
-    document.querySelectorAll('.submit-form').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const assignmentId = this.querySelector('.submit-btn').getAttribute('data-assignment-id');
-            const fileInput = this.querySelector('.file-input');
-
-            if (!fileInput || fileInput.files.length === 0) {
-                showNotification('Please select a file to upload.', 'error');
-                return;
-            }
-
-            const formData = new FormData(this);
-            formData.append('assignment_id', assignmentId);
-
-            submitAssignment(formData);
-        });
-    });
-
+    // Submit assignment
     function submitAssignment(formData) {
         showLoadingSpinner();
         fetch('/submit_assignment', {
@@ -238,140 +225,52 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function updateAssignmentStatus(assignmentId, status, grade = null) {
-        const assignmentCard = document.querySelector(`.assignment[data-id="${assignmentId}"]`);
+    document.querySelectorAll('.open-assignment').forEach(button => {
+        button.addEventListener('click', function() {
+            const assignmentId = this.getAttribute('data-assignment-id');
+            showLoadingSpinner();
+            fetch(`/open_assignment/${assignmentId}`)
+                .then(response => response.json())
+                .then(data => {
+                    hideLoadingSpinner();
+                    if (data.success && data.file_url) {
+                        window.open(data.file_url, '_blank');
+                    } else {
+                        showNotification(data.message || 'Error opening assignment. Please try again.', 'error');
+                    }
+                })
+                .catch(error => {
+                    hideLoadingSpinner();
+                    console.error('Error:', error);
+                    showNotification('An error occurred. Please try again.', 'error');
+                });
+        });
+    });
+
+    // Update assignment status
+    function updateAssignmentStatus(assignmentId, status) {
+        const assignmentCard = document.querySelector(`.assignment-card[data-assignment-id="${assignmentId}"]`);
         if (assignmentCard) {
             const statusElement = assignmentCard.querySelector('.assignment-status');
-            const submitButton = assignmentCard.querySelector('.submit-btn');
-            const fileUpload = assignmentCard.querySelector('.file-upload');
-
-            if (grade !== null) {
-                status = 'Graded';
-                const gradeElement = assignmentCard.querySelector('.assignment-grade');
-                if (gradeElement) {
-                    gradeElement.textContent = `Grade: ${grade}`;
-                } else {
-                    const newGradeElement = document.createElement('p');
-                    newGradeElement.className = 'assignment-grade';
-                    newGradeElement.innerHTML = `<i class="fas fa-star"></i> Grade: ${grade}`;
-                    assignmentCard.insertBefore(newGradeElement, submitButton || fileUpload);
-                }
-            }
+            const cardActions = assignmentCard.querySelector('.card-actions');
 
             statusElement.innerHTML = `<i class="fas fa-circle"></i> ${status}`;
             statusElement.className = `assignment-status status-${status.toLowerCase().replace(' ', '-')}`;
 
-            if (status === 'Submitted' || status === 'Graded') {
-                if (submitButton) submitButton.style.display = 'none';
-                if (fileUpload) fileUpload.style.display = 'none';
+            if (status === 'Submitted') {
+                cardActions.innerHTML = `
+                    <button class="btn btn-secondary open-assignment" data-assignment-id="${assignmentId}">
+                        <i class="fas fa-folder-open"></i> Open
+                    </button>
+                `;
             }
         }
     }
 
-    function showNotification(message, type) {
-        const notificationContainer = document.getElementById('notification-container');
-        if (!notificationContainer) {
-            console.error('Notification container not found');
-            return;
-        }
-
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.textContent = message;
-        notificationContainer.appendChild(notification);
-
-        setTimeout(() => {
-            notification.classList.add('show');
-        }, 100);
-
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => {
-                notification.remove();
-            }, 300);
-        }, 3000);
-    }
-
-    function checkAuthStatus() {
-        fetch('/check_auth_status')
-            .then(response => response.json())
-            .then(data => {
-                if (!data.authenticated) {
-                    window.location.href = '/authorize';
-                }
-            })
-            .catch(error => console.error('Error checking auth status:', error));
-    }
-
-    // Toggle assignment details
-    const toggleDetailsBtns = document.querySelectorAll('.toggle-details');
-    toggleDetailsBtns.forEach(btn => {
-        btn.addEventListener('click', function () {
-            const details = this.nextElementSibling;
-            if (details.style.display === 'none') {
-                details.style.display = 'block';
-                this.textContent = 'Hide Details';
-            } else {
-                details.style.display = 'none';
-                this.textContent = 'Show Details';
-            }
-        });
-    });
-
-    // Course details toggle
-    const courseToggleDetailsBtns = document.querySelectorAll('.course .toggle-details');
-    courseToggleDetailsBtns.forEach(btn => {
-        btn.addEventListener('click', function () {
-            const details = this.closest('.course').querySelector('.course-details');
-            if (details.style.display === 'none') {
-                details.style.display = 'block';
-                this.textContent = 'Less Details';
-            } else {
-                details.style.display = 'none';
-                this.textContent = 'More Details';
-            }
-        });
-    });
-
-
-    // Settings page: Show/Hide GitHub token
-    const showGithubTokenBtn = document.getElementById('show-github-token');
-    if (showGithubTokenBtn) {
-        showGithubTokenBtn.addEventListener('click', function () {
-            const githubTokenInput = document.getElementById('github_token');
-            if (githubTokenInput.type === 'password') {
-                githubTokenInput.type = 'text';
-                this.textContent = 'Hide';
-            } else {
-                githubTokenInput.type = 'password';
-                this.textContent = 'Show';
-            }
-        });
-    }
-
-    // Delete account functionality
-    const deleteAccountBtn = document.getElementById('delete-account');
-    const deleteAccountModal = document.getElementById('delete-account-modal');
-    const confirmDeleteBtn = document.getElementById('confirm-delete');
-    const cancelDeleteBtn = document.getElementById('cancel-delete');
-
-    if (deleteAccountBtn && deleteAccountModal) {
-        deleteAccountBtn.addEventListener('click', () => {
-            deleteAccountModal.style.display = 'block';
-        });
-
-        cancelDeleteBtn.addEventListener('click', () => {
-            deleteAccountModal.style.display = 'none';
-        });
-
-        confirmDeleteBtn.addEventListener('click', () => {
-            // Add your account deletion logic here
-            console.log('Account deletion confirmed');
-            deleteAccountModal.style.display = 'none';
-        });
-    }
-
+    // Filter and sort assignments
     function applyFiltersAndSort() {
+        if (!assignmentsGrid) return;
+
         const assignments = Array.from(assignmentsGrid.children);
         const courseValue = courseFilter.value.toLowerCase();
         const statusValue = statusFilter.value.toLowerCase();
@@ -409,19 +308,76 @@ document.addEventListener('DOMContentLoaded', function () {
         visibleAssignments.forEach(assignment => assignmentsGrid.appendChild(assignment));
     }
 
-    courseFilter.addEventListener('change', applyFiltersAndSort);
-    statusFilter.addEventListener('change', applyFiltersAndSort);
-    sortFilter.addEventListener('change', applyFiltersAndSort);
+    // Settings page functionality
+    if (showGithubTokenBtn) {
+        showGithubTokenBtn.addEventListener('click', function () {
+            const githubTokenInput = document.getElementById('github_token');
+            if (githubTokenInput.type === 'password') {
+                githubTokenInput.type = 'text';
+                this.textContent = 'Hide';
+            } else {
+                githubTokenInput.type = 'password';
+                this.textContent = 'Show';
+            }
+        });
+    }
 
-    // Initialize components
-    applyFiltersAndSort();
-    setupThemeToggle();
-    applyTheme();
-    setInterval(checkAuthStatus, 5 * 60 * 1000);
-    checkAuthStatus();
+    function getCsrfToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrf_token') {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    // Delete account functionality
+    if (deleteAccountBtn && deleteAccountModal) {
+        const confirmDeleteBtn = document.getElementById('confirm-delete');
+        const cancelDeleteBtn = document.getElementById('cancel-delete');
+
+        deleteAccountBtn.addEventListener('click', () => {
+            deleteAccountModal.style.display = 'block';
+        });
+
+        cancelDeleteBtn.addEventListener('click', () => {
+            deleteAccountModal.style.display = 'none';
+        });
+
+        confirmDeleteBtn.addEventListener('click', () => {
+            showLoadingSpinner();
+            fetch('/delete_account', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken() // Implement this function to get the CSRF token
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoadingSpinner();
+                if (data.success) {
+                    showNotification('Account deleted successfully. Redirecting...', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/logout';
+                    }, 2000);
+                } else {
+                    showNotification(data.message || 'Error deleting account. Please try again.', 'error');
+                }
+            })
+            .catch(error => {
+                hideLoadingSpinner();
+                console.error('Error:', error);
+                showNotification('An error occurred. Please try again.', 'error');
+            });
+            deleteAccountModal.style.display = 'none';
+        
+        });
+    }
 
     // Populate time zone options
-    const timeZoneSelect = document.getElementById('time_zone');
     if (timeZoneSelect) {
         const timeZones = moment.tz.names();
         timeZones.forEach(zone => {
@@ -431,4 +387,43 @@ document.addEventListener('DOMContentLoaded', function () {
             timeZoneSelect.appendChild(option);
         });
     }
+
+    // Course details toggle
+    const courseToggleDetailsBtns = document.querySelectorAll('.course .toggle-details');
+    courseToggleDetailsBtns.forEach(btn => {
+        btn.addEventListener('click', function () {
+            const details = this.closest('.course').querySelector('.course-details');
+            if (details.style.display === 'none') {
+                details.style.display = 'block';
+                this.textContent = 'Less Details';
+            } else {
+                details.style.display = 'none';
+                this.textContent = 'More Details';
+            }
+        });
+    });
+
+    // Check authentication status
+    function checkAuthStatus() {
+        fetch('/check_auth_status')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.authenticated) {
+                    window.location.href = '/authorize';
+                }
+            })
+            .catch(error => console.error('Error checking auth status:', error));
+    }
+
+    // Initialize components
+    setupThemeToggle();
+    applyTheme();
+    if (courseFilter && statusFilter && sortFilter) {
+        courseFilter.addEventListener('change', applyFiltersAndSort);
+        statusFilter.addEventListener('change', applyFiltersAndSort);
+        sortFilter.addEventListener('change', applyFiltersAndSort);
+        applyFiltersAndSort();
+    }
+    setInterval(checkAuthStatus, 5 * 60 * 1000); // Check auth status every 5 minutes
+    checkAuthStatus();
 });
