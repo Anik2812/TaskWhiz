@@ -658,11 +658,17 @@ def analytics():
         total_assignments = 0
         total_submitted = 0
         submission_timeline = {}
+        grade_distribution = [0, 0, 0, 0, 0]  # A, B, C, D, F
+        workload_distribution = [0, 0, 0, 0, 0, 0, 0]  # Mon to Sun
+        total_grades = 0
+        total_grade_points = 0
 
         for course in courses:
             course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute().get('courseWork', [])
             course_assignments = len(course_work)
             submitted_assignments = 0
+            course_grade_points = 0
+            course_graded_assignments = 0
 
             for work in course_work:
                 submissions = classroom_service.courses().courseWork().studentSubmissions().list(
@@ -671,37 +677,63 @@ def analytics():
                     userId='me'
                 ).execute().get('studentSubmissions', [])
                 
-                if submissions and submissions[0]['state'] == 'TURNED_IN':
-                    submitted_assignments += 1
-                    submission_date = submissions[0]['updateTime'][:10]  # YYYY-MM-DD
-                    submission_timeline[submission_date] = submission_timeline.get(submission_date, 0) + 1
+                if submissions:
+                    submission = submissions[0]
+                    if submission['state'] == 'TURNED_IN':
+                        submitted_assignments += 1
+                        submission_date = datetime.fromisoformat(submission['updateTime'].replace('Z', '+00:00'))
+                        submission_timeline[submission_date.date()] = submission_timeline.get(submission_date.date(), 0) + 1
+                        workload_distribution[submission_date.weekday()] += 1
+
+                    if 'assignedGrade' in submission:
+                        grade = submission['assignedGrade'] / work['maxPoints']
+                        course_grade_points += grade
+                        course_graded_assignments += 1
+                        total_grade_points += grade
+                        total_grades += 1
+                        
+                        if grade >= 0.9:
+                            grade_distribution[0] += 1
+                        elif grade >= 0.8:
+                            grade_distribution[1] += 1
+                        elif grade >= 0.7:
+                            grade_distribution[2] += 1
+                        elif grade >= 0.6:
+                            grade_distribution[3] += 1
+                        else:
+                            grade_distribution[4] += 1
 
             completion_rate = (submitted_assignments / course_assignments) * 100 if course_assignments > 0 else 0
+            average_grade = (course_grade_points / course_graded_assignments) * 100 if course_graded_assignments > 0 else 0
 
             analytics_data.append({
                 'course_name': course['name'],
                 'total_assignments': course_assignments,
                 'submitted_assignments': submitted_assignments,
-                'completion_rate': round(completion_rate, 2)
+                'completion_rate': round(completion_rate, 2),
+                'average_grade': average_grade
             })
 
             total_assignments += course_assignments
             total_submitted += submitted_assignments
 
         overall_completion_rate = (total_submitted / total_assignments) * 100 if total_assignments > 0 else 0
+        average_grade = (total_grade_points / total_grades) * 100 if total_grades > 0 else 0
 
-        # Sort the submission timeline and get the last 30 days
         sorted_timeline = sorted(submission_timeline.items())[-30:]
-        submission_dates = [date for date, _ in sorted_timeline]
+        submission_dates = [date.strftime('%Y-%m-%d') for date, _ in sorted_timeline]
         submission_counts = [count for _, count in sorted_timeline]
 
         return render_template('analytics.html', 
                                analytics_data=analytics_data,
                                overall_completion_rate=round(overall_completion_rate, 2),
+                               average_grade=average_grade,
                                total_courses=len(courses),
                                total_assignments=total_assignments,
                                submission_timeline=submission_dates,
-                               submission_counts=submission_counts)
+                               submission_counts=submission_counts,
+                               grade_distribution=grade_distribution,
+                               workload_distribution=workload_distribution)
     except Exception as e:
         logger.error(f"Error fetching analytics: {str(e)}")
         return redirect(url_for('error_page', message="Failed to load analytics"))

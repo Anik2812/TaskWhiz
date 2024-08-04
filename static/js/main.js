@@ -322,6 +322,120 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function initializeAnalytics() {
+        if (!document.getElementById('submissionChart')) return;
+    
+        // Submission Timeline Chart
+        var ctx = document.getElementById('submissionChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: analyticsData.submissionTimeline,
+                datasets: [{
+                    label: 'Submissions',
+                    data: analyticsData.submissionCounts,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    
+        // Course Completion Rates Chart
+        var ctx2 = document.getElementById('completionChart').getContext('2d');
+        new Chart(ctx2, {
+            type: 'bar',
+            data: {
+                labels: analyticsData.courseNames,
+                datasets: [{
+                    label: 'Completion Rate (%)',
+                    data: analyticsData.completionRates,
+                    backgroundColor: 'rgba(75, 192, 192, 0.6)'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    
+        // Grade Distribution Chart
+        var ctx3 = document.getElementById('gradeDistributionChart').getContext('2d');
+        new Chart(ctx3, {
+            type: 'pie',
+            data: {
+                labels: ['A', 'B', 'C', 'D', 'F'],
+                datasets: [{
+                    data: analyticsData.gradeDistribution,
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 206, 86, 0.6)',
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(255, 99, 132, 0.6)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                }
+            }
+        });
+    
+        // Workload Distribution Chart
+        var ctx4 = document.getElementById('workloadDistributionChart').getContext('2d');
+        new Chart(ctx4, {
+            type: 'radar',
+            data: {
+                labels: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+                datasets: [{
+                    label: 'Assignment Due Dates',
+                    data: analyticsData.workloadDistribution,
+                    fill: true,
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    pointBackgroundColor: 'rgb(255, 99, 132)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgb(255, 99, 132)'
+                }]
+            },
+            options: {
+                elements: {
+                    line: {
+                        borderWidth: 3
+                    }
+                }
+            }
+        });
+    
+        // Initialize DataTable for course details
+        $('#courseDetailsTable').DataTable({
+            pageLength: 10,
+            lengthChange: false,
+            searching: true,
+            ordering: true,
+            info: true,
+            paging: true
+        });
+    }
+
     function getCsrfToken() {
         const cookies = document.cookie.split(';');
         for (let cookie of cookies) {
@@ -425,5 +539,6 @@ document.addEventListener('DOMContentLoaded', function () {
         applyFiltersAndSort();
     }
     setInterval(checkAuthStatus, 5 * 60 * 1000); // Check auth status every 5 minutes
+    initializeAnalytics();
     checkAuthStatus();
 });
