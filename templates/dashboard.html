@@ -1,6 +1,91 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
+<style>
+    :root {
+        --primary-color: #4a90e2;
+        --primary-light: #6aa7e8;
+        --primary-dark: #3a7cbd;
+        --secondary-color: #f5a623;
+        --secondary-light: #f7b84d;
+        --secondary-dark: #e09612;
+        --background-color: #f0f4f8;
+        --text-color: #333;
+        --text-light: #6c757d;
+        --card-background: #ffffff;
+        --shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    body.dark-theme {
+        --background-color: #1a1a1a;
+        --text-color: #f0f0f0;
+        --text-light: #b0b0b0;
+        --card-background: #2a2a2a;
+        --shadow: 0 10px 20px rgba(255, 255, 255, 0.1);
+    }
+
+    body {
+        background-color: var(--background-color);
+        color: var(--text-color);
+        transition: background-color 0.3s, color 0.3s;
+    }
+
+    .dashboard-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .dashboard-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+
+    .summary-card {
+        background: var(--card-background);
+        color: var(--text-color);
+        border-radius: 15px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        box-shadow: var(--shadow);
+    }
+
+    .summary-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .assignments-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 2rem;
+    }
+
+    .assignment-card {
+        background-color: var(--card-background);
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: var(--shadow);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .assignment-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .btn {
+        background-color: var(--secondary-color);
+        color: #fff;
+        transition: background-color 0.3s;
+    }
+
+    .btn:hover {
+        background-color: var(--secondary-dark);
+    }
+</style>
+
 <div class="dashboard-container">
     <h1 class="page-title fade-in"><i class="fas fa-tachometer-alt"></i> Your Dashboard</h1>
     <div class="dashboard-summary">

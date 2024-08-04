@@ -196,7 +196,7 @@ main {
   margin-bottom: 1.5rem;
 }
 
-.file-upload {
+/* .file-upload {
   margin-top: 2rem;
 }
 
@@ -221,7 +221,7 @@ main {
 
 .file-upload label.file-selected {
   background-color: var(--primary-dark);
-}
+} */
 
 .submit-btn {
   display: inline-block;
