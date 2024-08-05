@@ -715,24 +715,23 @@ def analytics():
 
         # Prepare chart data
         chart_data = {
-            'submissionTimeline': {
-                'dates': [date.strftime('%Y-%m-%d') for date in submission_dates],
-                'counts': submission_counts
-            },
-            'courseNames': [course['course_name'] for course in analytics_data],
-            'completionRates': [course['completion_rate'] for course in analytics_data],
-            'gradeDistribution': [0, 0, 0, 0, 0],  # Placeholder for grade distribution
-            'workloadDistribution': [0] * 7  # Placeholder for workload distribution
+        'submissionTimeline': {
+            'dates': [...],  # list of dates
+            'counts': [...]  # list of submission counts
+        },
+        'courseNames': [...],  # list of course names
+        'completionRates': [...],  # list of completion rates
+        'gradeDistribution': [...],  # list of grade distribution data
+            'workloadDistribution': [...]  # list of workload distribution data
         }
-        logger.info(f"Successfully rendered analytics for user {current_user.id}")
 
         return render_template('analytics.html',
-                               total_courses=total_courses,
-                               total_assignments=total_assignments,
-                               overall_completion_rate=overall_completion_rate,
-                               average_grade=average_grade,
-                               analytics_data=analytics_data,
-                               chart_data=json.dumps(chart_data))
+                            total_courses=total_courses,
+                            total_assignments=total_assignments,
+                            overall_completion_rate=overall_completion_rate,
+                            average_grade=average_grade,
+                            analytics_data=analytics_data,
+                            chart_data=chart_data)
 
     except Exception as e:
         logger.error(f"Error in analytics route: {str(e)}", exc_info=True)
