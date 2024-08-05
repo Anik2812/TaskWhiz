@@ -73,7 +73,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
 <script>
-    var chartData = {{ chart_data|safe }};
+    var analytics_data = JSON.parse('{{ analyticsData|tojson|safe }}');
+    var chartData = JSON.parse('{{ chartData|tojson|safe }}');
 </script>
 <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
 {% endblock %}

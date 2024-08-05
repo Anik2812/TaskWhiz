@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const showGithubTokenBtn = document.getElementById('show-github-token');
     const deleteAccountBtn = document.getElementById('delete-account');
     const deleteAccountModal = document.getElementById('delete-account-modal');
-    
+
 
 
     // Theme toggle functionality
@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // View Details functionality
         document.querySelectorAll('.view-details').forEach(button => {
-            button.addEventListener('click', function() {
+            button.addEventListener('click', function () {
                 const assignmentId = this.getAttribute('data-assignment-id');
                 fetchAssignmentDetails(assignmentId);
             });
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Submit Assignment functionality
         document.querySelectorAll('.submit-form').forEach(form => {
-            form.addEventListener('submit', function(e) {
+            form.addEventListener('submit', function (e) {
                 e.preventDefault();
                 const assignmentId = this.querySelector('.submit-btn').getAttribute('data-assignment-id');
                 const fileInput = this.querySelector('.file-input');
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function () {
             modal.className = 'modal';
             document.body.appendChild(modal);
         }
-    
+
         const detailsHtml = `
             <div class="modal-content">
                 <span class="close">&times;</span>
@@ -175,22 +175,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 ${assignment.feedback ? `<p><strong>Feedback:</strong> ${assignment.feedback}</p>` : ''}
             </div>
         `;
-    
+
         modal.innerHTML = detailsHtml;
         modal.style.display = 'block';
-    
+
         const closeSpan = modal.querySelector('.close');
-        closeSpan.onclick = function() {
+        closeSpan.onclick = function () {
             modal.style.display = 'none';
         }
-    
-        window.onclick = function(event) {
+
+        window.onclick = function (event) {
             if (event.target == modal) {
                 modal.style.display = 'none';
             }
         }
-    
-        document.addEventListener('keydown', function(event) {
+
+        document.addEventListener('keydown', function (event) {
             if (event.key === 'Escape' && modal.style.display === 'block') {
                 modal.style.display = 'none';
             }
@@ -210,25 +210,25 @@ document.addEventListener('DOMContentLoaded', function () {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
-        .then(data => {
-            hideLoadingSpinner();
-            if (data.success) {
-                showNotification('Assignment submitted successfully!', 'success');
-                updateAssignmentStatus(data.assignment_id, 'Submitted');
-            } else {
-                showNotification(data.message || 'Error submitting assignment. Please try again.', 'error');
-            }
-        })
-        .catch(error => {
-            hideLoadingSpinner();
-            console.error('Error:', error);
-            showNotification('An error occurred. Please try again.', 'error');
-        });
+            .then(response => response.json())
+            .then(data => {
+                hideLoadingSpinner();
+                if (data.success) {
+                    showNotification('Assignment submitted successfully!', 'success');
+                    updateAssignmentStatus(data.assignment_id, 'Submitted');
+                } else {
+                    showNotification(data.message || 'Error submitting assignment. Please try again.', 'error');
+                }
+            })
+            .catch(error => {
+                hideLoadingSpinner();
+                console.error('Error:', error);
+                showNotification('An error occurred. Please try again.', 'error');
+            });
     }
 
     document.querySelectorAll('.open-assignment').forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             const assignmentId = this.getAttribute('data-assignment-id');
             showLoadingSpinner();
             fetch(`/open_assignment/${assignmentId}`)
@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function initializeAnalytics() {
         if (!document.getElementById('submissionChart')) return;
-    
+
         // Submission Timeline Chart
         var ctx = document.getElementById('submissionChart').getContext('2d');
         new Chart(ctx, {
@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
-    
+
         // Course Completion Rates Chart
         var ctx2 = document.getElementById('completionChart').getContext('2d');
         new Chart(ctx2, {
@@ -372,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
-    
+
         // Grade Distribution Chart
         var ctx3 = document.getElementById('gradeDistributionChart').getContext('2d');
         new Chart(ctx3, {
@@ -399,7 +399,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
-    
+
         // Workload Distribution Chart
         var ctx4 = document.getElementById('workloadDistributionChart').getContext('2d');
         new Chart(ctx4, {
@@ -426,7 +426,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
-    
+
         // Initialize DataTable for course details
         $('#courseDetailsTable').DataTable({
             pageLength: 10,
@@ -437,7 +437,7 @@ document.addEventListener('DOMContentLoaded', function () {
             paging: true
         });
     }
-    
+
     document.addEventListener('DOMContentLoaded', initializeAnalytics);
 
     function getCsrfToken() {
@@ -473,25 +473,25 @@ document.addEventListener('DOMContentLoaded', function () {
                     'X-CSRFToken': getCsrfToken() // Implement this function to get the CSRF token
                 }
             })
-            .then(response => response.json())
-            .then(data => {
-                hideLoadingSpinner();
-                if (data.success) {
-                    showNotification('Account deleted successfully. Redirecting...', 'success');
-                    setTimeout(() => {
-                        window.location.href = '/logout';
-                    }, 2000);
-                } else {
-                    showNotification(data.message || 'Error deleting account. Please try again.', 'error');
-                }
-            })
-            .catch(error => {
-                hideLoadingSpinner();
-                console.error('Error:', error);
-                showNotification('An error occurred. Please try again.', 'error');
-            });
+                .then(response => response.json())
+                .then(data => {
+                    hideLoadingSpinner();
+                    if (data.success) {
+                        showNotification('Account deleted successfully. Redirecting...', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/logout';
+                        }, 2000);
+                    } else {
+                        showNotification(data.message || 'Error deleting account. Please try again.', 'error');
+                    }
+                })
+                .catch(error => {
+                    hideLoadingSpinner();
+                    console.error('Error:', error);
+                    showNotification('An error occurred. Please try again.', 'error');
+                });
             deleteAccountModal.style.display = 'none';
-        
+
         });
     }
 
@@ -527,10 +527,16 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(response => response.json())
             .then(data => {
                 if (!data.authenticated) {
-                    window.location.href = '/authorize';
+                    showNotification('Your session has expired. Please log in again.', 'warning');
+                    setTimeout(() => {
+                        window.location.href = '/authorize';
+                    }, 2000);
                 }
             })
-            .catch(error => console.error('Error checking auth status:', error));
+            .catch(error => {
+                console.error('Error checking auth status:', error);
+                showNotification('An error occurred. Please refresh the page.', 'error');
+            });
     }
 
     // Initialize components
@@ -545,4 +551,5 @@ document.addEventListener('DOMContentLoaded', function () {
     setInterval(checkAuthStatus, 5 * 60 * 1000); // Check auth status every 5 minutes
     initializeAnalytics();
     checkAuthStatus();
+
 });

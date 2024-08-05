@@ -31,13 +31,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from flask_talisman import Talisman
-from flask_login import LoginManager, current_user
-from flask_login import UserMixin
-from flask_login import logout_user
-
-
-
-
+from flask_login import LoginManager, current_user, login_user, logout_user, login_required, UserMixin
+from flask_sqlalchemy import SQLAlchemy
 
 # Enhanced logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s')
@@ -68,8 +63,7 @@ cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 limiter = Limiter(key_func=get_remote_address)
 limiter.init_app(app)
 
-# Setup database connection (using SQLAlchemy as an example)
-from flask_sqlalchemy import SQLAlchemy
+# Setup database connection
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///taskwhiz.db'
 db = SQLAlchemy(app)
 
@@ -80,6 +74,9 @@ class User(db.Model, UserMixin):
     settings = db.Column(db.JSON)
     assignments = db.relationship('Assignment', backref='user', lazy=True)
     courses = db.relationship('Course', backref='user', lazy=True)
+
+    def get_id(self):
+        return str(self.id)
 
 # Assignment model
 class Assignment(db.Model):
@@ -94,6 +91,7 @@ class Assignment(db.Model):
     feedback = db.Column(db.Text)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
+    submitted_date = db.Column(db.DateTime)
 
 # Course model
 class Course(db.Model):
@@ -101,10 +99,6 @@ class Course(db.Model):
     name = db.Column(db.String(100), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     assignments = db.relationship('Assignment', backref='course', lazy=True)
-
-# Create tables
-with app.app_context():
-    db.create_all()
 
 # Create tables
 with app.app_context():
@@ -125,13 +119,13 @@ SCOPES = [
     'https://www.googleapis.com/auth/classroom.courses'
 ]
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'credentials' not in session:
-            return redirect(url_for('authorize'))
-        return f(*args, **kwargs)
-    return decorated_function
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'authorize'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
 @cache.memoize(timeout=300)
 def get_credentials():
@@ -149,8 +143,17 @@ def get_credentials():
 
 @app.before_request
 def before_request():
-    if 'credentials' in session:
-        get_credentials()
+    if current_user.is_authenticated and 'credentials' in session:
+        credentials = Credentials(**session['credentials'])
+        if credentials.expired and credentials.refresh_token:
+            try:
+                credentials.refresh(Request())
+                session['credentials'] = credentials_to_dict(credentials)
+            except RefreshError:
+                logout_user()
+                session.clear()
+                flash("Your session has expired. Please log in again.", "error")
+                return redirect(url_for('authorize'))
 
 @app.context_processor
 def inject_user():
@@ -167,14 +170,6 @@ def inject_user():
             logger.error(f"Error fetching user info: {str(e)}")
             session.clear()
     return dict()
-
-login_manager = LoginManager()
-login_manager.init_app(app)
-
-@login_manager.user_loader
-def load_user(user_id):
-    # Return your User object here
-    return User.query.get(int(user_id))
 
 @app.route('/check_auth_status')
 @cache.cached(timeout=60)
@@ -328,6 +323,19 @@ def oauth2callback():
     flow.fetch_token(authorization_response=request.url)
     credentials = flow.credentials
     session['credentials'] = credentials_to_dict(credentials)
+
+    # Get user info and log in the user
+    user_info_service = build('oauth2', 'v2', credentials=credentials)
+    user_info = user_info_service.userinfo().get().execute()
+    email = user_info['email']
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        user = User(email=email)
+        db.session.add(user)
+        db.session.commit()
+
+    login_user(user)
     return redirect(url_for('dashboard'))
 
 def credentials_to_dict(credentials):
@@ -413,6 +421,7 @@ def error_page():
 @login_required
 def logout():
     logout_user()
+    session.clear()
     return redirect(url_for('index'))
 
 @app.route('/submit/<assignment_id>', methods=['POST'])
@@ -514,7 +523,6 @@ def assignments():
     classroom_service = build('classroom', 'v1', credentials=credentials)
     
     try:
-        # Fetch courses from Google Classroom
         courses_result = classroom_service.courses().list(pageSize=10).execute()
         courses = courses_result.get('courses', [])
 
@@ -524,7 +532,6 @@ def assignments():
             for work in course_work.get('courseWork', []):
                 due_date = parse_due_date(work.get('dueDate', {}))
                 
-                # Fetch submission status
                 submissions = classroom_service.courses().courseWork().studentSubmissions().list(
                     courseId=course['id'],
                     courseWorkId=work['id'],
@@ -624,145 +631,6 @@ def settings():
 
     return render_template('settings.html', user_settings=user_settings, user_info=user_info)
 
-# @app.route('/update_settings', methods=['POST'])
-# @login_required
-# @limiter.limit("5/minute")
-# def update_settings():
-#     credentials = get_credentials()
-#     user_info_service = build('oauth2', 'v2', credentials=credentials)
-#     user_info = user_info_service.userinfo().get().execute()
-
-#     email_notifications = 'email_notifications' in request.form
-#     github_token = request.form.get('github_token')
-#     custom_setting = request.form.get('custom_setting')
-
-#     user = User.query.filter_by(email=user_info['email']).first()
-#     if not user:
-#         user = User(email=user_info['email'])
-#         db.session.add(user)
-
-#     user.settings = {
-#         'email_notifications': email_notifications,
-#         'github_token': github_token,
-#         'custom_setting': custom_setting
-#     }
-#     db.session.commit()
-
-#     app.config['EMAIL_NOTIFICATIONS'] = email_notifications
-#     app.config['GITHUB_TOKEN'] = github_token
-
-#     flash('Settings updated successfully', 'success')
-#     return redirect(url_for('settings'))
-
-@app.route('/check_user_permission')
-@login_required
-@cache.cached(timeout=300)
-def check_user_permission():
-    credentials = get_credentials()
-    classroom_service = build('classroom', 'v1', credentials=credentials)
-
-    try:
-        user_id = 'me'
-        user_profile = classroom_service.userProfiles().get(userId=user_id).execute()
-        
-        permissions = user_profile.get('permissions', [])
-
-        has_create_course_permission = 'CREATE_COURSE' in permissions
-        has_view_course_permission = 'VIEW_COURSE' in permissions
-        has_manage_course_permission = 'MANAGE_COURSE' in permissions
-
-        return jsonify({
-            'user_id': user_id,
-            'has_create_course_permission': has_create_course_permission,
-            'has_view_course_permission': has_view_course_permission,
-            'has_manage_course_permission': has_manage_course_permission
-        })
-    except Exception as e:
-        logger.error(f"Error checking permissions: {str(e)}")
-        return jsonify({'success': False, 'message': f"Error checking permissions: {str(e)}"})
-    
-@app.route('/assignment/<int:assignment_id>', methods=['GET'])
-@login_required
-def get_assignment_details(assignment_id):
-    assignment = Assignment.query.get(assignment_id)
-    if assignment and assignment.user_id == current_user.id:
-        return jsonify({
-            'success': True,
-            'assignment': {
-                'id': assignment.id,
-                'title': assignment.title,
-                'course': assignment.course.name,
-                'due_date': assignment.due_date.isoformat(),
-                'status': assignment.status,
-                'description': assignment.description,
-                'file_url': assignment.file_url if assignment.file_url else None,
-                'grade': assignment.grade,
-                'total_marks': assignment.total_marks,
-                'feedback': assignment.feedback
-            }
-        })
-    return jsonify({'success': False, 'message': 'Assignment not found'}), 404
-
-@app.route('/submit_assignment', methods=['POST'])
-@login_required
-def submit_assignment():
-    assignment_id = request.form.get('assignment_id')
-    file = request.files.get('assignment_file')
-    
-    if not assignment_id or not file:
-        return jsonify({'success': False, 'message': 'Missing assignment ID or file'}), 400
-    
-    assignment = Assignment.query.get(assignment_id)
-    if not assignment or assignment.user_id != current_user.id:
-        return jsonify({'success': False, 'message': 'Assignment not found'}), 404
-    
-    if assignment.status != 'Not Submitted':
-        return jsonify({'success': False, 'message': 'Assignment already submitted'}), 400
-    
-    # Save the file
-    filename = secure_filename(file.filename)
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(file_path)
-    
-    # Update assignment status
-    assignment.status = 'Submitted'
-    assignment.file_url = file_path
-    assignment.submitted_date = datetime.utcnow()
-    
-    db.session.commit()
-    
-    return jsonify({'success': True, 'message': 'Assignment submitted successfully', 'assignment_id': assignment.id})
-
-@app.route('/delete_account', methods=['POST'])
-@login_required
-def delete_account():
-    # Remove user's assignments
-    Assignment.query.filter_by(user_id=current_user.id).delete()
-    
-    # Remove user's courses
-    Course.query.filter_by(user_id=current_user.id).delete()
-    
-    # Remove the user
-    db.session.delete(current_user)
-    db.session.commit()
-    
-    logout_user()
-    
-    return jsonify({'success': True, 'message': 'Account deleted successfully'})
-
-@app.route('/update_settings', methods=['POST'])
-@login_required
-def update_settings():
-    github_token = request.form.get('github_token')
-    time_zone = request.form.get('time_zone')
-    
-    current_user.github_token = github_token
-    current_user.time_zone = time_zone
-    
-    db.session.commit()
-    
-    return jsonify({'success': True, 'message': 'Settings updated successfully'})
-
 @app.route('/create_course', methods=['POST'])
 @login_required
 def create_course():
@@ -792,26 +660,38 @@ def create_course():
 @app.route('/analytics')
 @login_required
 def analytics():
-    try:
-        # Fetch data from the database
-        total_courses = Course.query.filter_by(user_id=current_user.id).count()
-        total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
-        completed_assignments = Assignment.query.filter_by(user_id=current_user.id, status='Submitted').count()
-        overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
-        average_grade = db.session.query(func.avg(Assignment.grade)).filter(Assignment.user_id == current_user.id, Assignment.grade != None).scalar() or 0
+    if not current_user.is_authenticated:
+        flash("Please log in to view analytics.", "error")
+        return redirect(url_for('authorize'))
 
-        # Calculate submission timeline
+    try:
+        total_courses = Course.query.filter_by(user_id=current_user.id).count()
+        logger.debug(f"Total courses: {total_courses}")
+
+        total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
+        logger.debug(f"Total assignments: {total_assignments}")
+
+        completed_assignments = Assignment.query.filter_by(user_id=current_user.id, status='Submitted').count()
+        logger.debug(f"Completed assignments: {completed_assignments}")
+
+        overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
+        logger.debug(f"Overall completion rate: {overall_completion_rate}")
+
+        average_grade = db.session.query(func.avg(Assignment.grade)).filter(Assignment.user_id == current_user.id, Assignment.grade != None).scalar() or 0
+        logger.debug(f"Average grade: {average_grade}")
+
         assignments = Assignment.query.filter_by(user_id=current_user.id).all()
         submission_timeline = {}
         for assignment in assignments:
             if assignment.submitted_date:
                 date = assignment.submitted_date.date()
                 submission_timeline[date] = submission_timeline.get(date, 0) + 1
-        
+
         submission_dates = sorted(submission_timeline.keys())[-30:]  # Last 30 days
         submission_counts = [submission_timeline[date] for date in submission_dates]
+        logger.debug(f"Submission dates: {submission_dates}")
+        logger.debug(f"Submission counts: {submission_counts}")
 
-        # Calculate analytics data for each course
         courses = Course.query.filter_by(user_id=current_user.id).all()
         analytics_data = []
         for course in courses:
@@ -820,7 +700,7 @@ def analytics():
             submitted_course_assignments = sum(1 for a in course_assignments if a.status in ['Submitted', 'Graded'])
             completion_rate = (submitted_course_assignments / total_course_assignments * 100) if total_course_assignments > 0 else 0
             average_course_grade = sum(a.grade for a in course_assignments if a.grade is not None) / sum(1 for a in course_assignments if a.grade is not None) if any(a.grade is not None for a in course_assignments) else 0
-            
+
             analytics_data.append({
                 'course_name': course.name,
                 'total_assignments': total_course_assignments,
@@ -828,8 +708,8 @@ def analytics():
                 'completion_rate': completion_rate,
                 'average_grade': average_course_grade
             })
+        logger.debug(f"Analytics data: {analytics_data}")
 
-        # Calculate grade distribution
         grade_distribution = [0, 0, 0, 0, 0]  # A, B, C, D, F
         for assignment in assignments:
             if assignment.grade is not None:
@@ -843,12 +723,13 @@ def analytics():
                     grade_distribution[3] += 1
                 else:
                     grade_distribution[4] += 1
+        logger.debug(f"Grade distribution: {grade_distribution}")
 
-        # Calculate workload distribution
         workload_distribution = [0] * 7  # Mon to Sun
         for assignment in assignments:
             if assignment.due_date:
                 workload_distribution[assignment.due_date.weekday()] += 1
+        logger.debug(f"Workload distribution: {workload_distribution}")
 
         chart_data = {
             'submissionTimeline': {
@@ -859,19 +740,141 @@ def analytics():
             'completionRates': [course['completion_rate'] for course in analytics_data],
             'gradeDistribution': grade_distribution,
             'workloadDistribution': workload_distribution
-    }
+        }
+        logger.debug(f"Chart data: {chart_data}")
 
         return render_template('analytics.html',
-                           total_courses=total_courses,
-                           total_assignments=total_assignments,
-                           overall_completion_rate=overall_completion_rate,
-                           average_grade=average_grade,
-                           analytics_data=analytics_data,
-                           chart_data=json.dumps(chart_data))
+                               total_courses=total_courses,
+                               total_assignments=total_assignments,
+                               overall_completion_rate=overall_completion_rate,
+                               average_grade=average_grade,
+                               analytics_data=analytics_data,
+                               chart_data=json.dumps(chart_data))
     except Exception as e:
         logger.error(f"Error in analytics route: {str(e)}", exc_info=True)
         flash("Failed to load analytics. Please try again later.", "error")
         return redirect(url_for('dashboard'))
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    app.logger.error(f"Unhandled exception: {str(e)}")
+    return jsonify({'error': 'An unexpected error occurred'}), 500
+
+@app.errorhandler(RefreshError)
+def handle_refresh_error(e):
+    session.clear()
+    return redirect(url_for('authorize'))
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template('500.html'), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, ssl_context='adhoc')
+def analytics():
+    if not current_user.is_authenticated:
+        flash("Please log in to view analytics.", "error")
+        return redirect(url_for('authorize'))
+
+    try:
+        total_courses = Course.query.filter_by(user_id=current_user.id).count()
+        logger.debug(f"Total courses: {total_courses}")
+
+        total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
+        logger.debug(f"Total assignments: {total_assignments}")
+
+        completed_assignments = Assignment.query.filter_by(user_id=current_user.id, status='Submitted').count()
+        logger.debug(f"Completed assignments: {completed_assignments}")
+
+        overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
+        logger.debug(f"Overall completion rate: {overall_completion_rate}")
+
+        average_grade = db.session.query(func.avg(Assignment.grade)).filter(Assignment.user_id == current_user.id, Assignment.grade != None).scalar() or 0
+        logger.debug(f"Average grade: {average_grade}")
+
+        assignments = Assignment.query.filter_by(user_id=current_user.id).all()
+        submission_timeline = {}
+        for assignment in assignments:
+            if assignment.submitted_date:
+                date = assignment.submitted_date.date()
+                submission_timeline[date] = submission_timeline.get(date, 0) + 1
+
+        submission_dates = sorted(submission_timeline.keys())[-30:]  # Last 30 days
+        submission_counts = [submission_timeline[date] for date in submission_dates]
+        logger.debug(f"Submission dates: {submission_dates}")
+        logger.debug(f"Submission counts: {submission_counts}")
+
+        courses = Course.query.filter_by(user_id=current_user.id).all()
+        analytics_data = []
+        for course in courses:
+            course_assignments = Assignment.query.filter_by(user_id=current_user.id, course_id=course.id).all()
+            total_course_assignments = len(course_assignments)
+            submitted_course_assignments = sum(1 for a in course_assignments if a.status in ['Submitted', 'Graded'])
+            completion_rate = (submitted_course_assignments / total_course_assignments * 100) if total_course_assignments > 0 else 0
+            average_course_grade = sum(a.grade for a in course_assignments if a.grade is not None) / sum(1 for a in course_assignments if a.grade is not None) if any(a.grade is not None for a in course_assignments) else 0
+
+            analytics_data.append({
+                'course_name': course.name,
+                'total_assignments': total_course_assignments,
+                'submitted_assignments': submitted_course_assignments,
+                'completion_rate': completion_rate,
+                'average_grade': average_course_grade
+            })
+        logger.debug(f"Analytics data: {analytics_data}")
+
+        grade_distribution = [0, 0, 0, 0, 0]  # A, B, C, D, F
+        for assignment in assignments:
+            if assignment.grade is not None:
+                if assignment.grade >= 90:
+                    grade_distribution[0] += 1
+                elif assignment.grade >= 80:
+                    grade_distribution[1] += 1
+                elif assignment.grade >= 70:
+                    grade_distribution[2] += 1
+                elif assignment.grade >= 60:
+                    grade_distribution[3] += 1
+                else:
+                    grade_distribution[4] += 1
+        logger.debug(f"Grade distribution: {grade_distribution}")
+
+        workload_distribution = [0] * 7  # Mon to Sun
+        for assignment in assignments:
+            if assignment.due_date:
+                workload_distribution[assignment.due_date.weekday()] += 1
+        logger.debug(f"Workload distribution: {workload_distribution}")
+
+        chart_data = {
+            'submissionTimeline': {
+                'dates': [date.strftime('%Y-%m-%d') for date in submission_dates],
+                'counts': submission_counts
+            },
+            'courseNames': [course['course_name'] for course in analytics_data],
+            'completionRates': [course['completion_rate'] for course in analytics_data],
+            'gradeDistribution': grade_distribution,
+            'workloadDistribution': workload_distribution
+        }
+        logger.debug(f"Chart data: {chart_data}")
+
+        return render_template('analytics.html',
+                               total_courses=total_courses,
+                               total_assignments=total_assignments,
+                               overall_completion_rate=overall_completion_rate,
+                               average_grade=average_grade,
+                               analytics_data=analytics_data,
+                               chart_data=json.dumps(chart_data))
+    except Exception as e:
+        logger.error(f"Error in analytics route: {str(e)}", exc_info=True)
+        flash("Failed to load analytics. Please try again later.", "error")
+        return redirect(url_for('dashboard'))
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    app.logger.error(f"Unhandled exception: {str(e)}")
+    return jsonify({'error': 'An unexpected error occurred'}), 500
 
 @app.errorhandler(RefreshError)
 def handle_refresh_error(e):
