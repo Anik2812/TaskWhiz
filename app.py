@@ -66,11 +66,6 @@ limiter.init_app(app)
 # Setup database connection
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///taskwhiz.db'
 db = SQLAlchemy(app)
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 10,
-    'pool_recycle': 60,
-    'pool_pre_ping': True
-}
 
 # User model
 class User(db.Model, UserMixin):
@@ -732,37 +727,9 @@ def analytics():
 
     except Exception as e:
         logger.error(f"Error in analytics route: {str(e)}", exc_info=True)
-        try:
-            total_courses = Course.query.filter_by(user_id=current_user.id).count()
-            total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
-            
-            return render_template('basic_analytics.html',
-                                   total_courses=total_courses,
-                                   total_assignments=total_assignments)
-        except Exception as inner_e:
-            logger.error(f"Error in fallback analytics: {str(inner_e)}", exc_info=True)
-            flash("Unable to load analytics at this time. Please try again later.", "error")
-            return redirect(url_for('dashboard'))
-
-def check_database_health():
-    try:
-        # Perform a simple query
-        User.query.first()
-        return True
-    except Exception as e:
-        logger.error(f"Database health check failed: {str(e)}")
-        return False
-
-# Run this check periodically (e.g., every 5 minutes)
-schedule.every(5).minutes.do(check_database_health)
-
-import sqlalchemy
-
-@app.errorhandler(sqlalchemy.exc.SQLAlchemyError)
-def handle_db_error(e):
-    logger.error(f"Database error: {str(e)}")
-    return render_template('db_error.html'), 500
-
+        flash("An error occurred while loading analytics. Our team has been notified.", "error")
+        return redirect(url_for('dashboard'))
+        
 
 @app.errorhandler(Exception)
 def handle_exception(e):
