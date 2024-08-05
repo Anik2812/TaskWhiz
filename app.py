@@ -10,6 +10,7 @@ import requests
 from sqlalchemy import func
 import functools
 from functools import wraps, partial
+from datetime import datetime
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from github import Github, GithubException
@@ -19,7 +20,6 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 from googleapiclient.errors import HttpError
-import schedule
 import smtplib
 from email.mime.text import MIMEText
 import requests
@@ -374,8 +374,7 @@ def dashboard():
 
             due_date = work.get('dueDate')
             if due_date:
-                due_date = datetime(year=due_date['year'], month=due_date['month'], day=due_date['day'])
-            
+                    due_date = datetime(year=due_date['year'], month=due_date['month'], day=due_date['day'])            
             assignment = {
                 'id': work['id'],
                 'title': work['title'],
@@ -515,13 +514,12 @@ def assignments():
     classroom_service = build('classroom', 'v1', credentials=credentials)
     
     try:
-        courses = Course.query.filter_by(user_id=current_user.id).all()
+        # Fetch courses from Google Classroom
+        courses_result = classroom_service.courses().list(pageSize=10).execute()
+        courses = courses_result.get('courses', [])
 
         all_assignments = []
-        assignments = Assignment.query.filter_by(user_id=current_user.id).all()
-
-
-        for course in courses.get('courses', []):
+        for course in courses:
             course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute()
             for work in course_work.get('courseWork', []):
                 due_date = parse_due_date(work.get('dueDate', {}))
@@ -556,7 +554,7 @@ def assignments():
                 all_assignments.append(assignment)
         
         logger.info(f"Fetched {len(all_assignments)} assignments successfully")
-        return render_template('assignments.html', assignments=assignments, courses=courses)
+        return render_template('assignments.html', assignments=all_assignments, courses=courses)
     except Exception as e:
         logger.error(f"Error in assignments route: {str(e)}", exc_info=True)
         flash("Failed to load assignments. Please try again later.", "error")
@@ -795,7 +793,7 @@ def create_course():
 @login_required
 def analytics():
     try:
-        # Fetch analytics data
+        # Fetch data from the database
         total_courses = Course.query.filter_by(user_id=current_user.id).count()
         total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
         completed_assignments = Assignment.query.filter_by(user_id=current_user.id, status='Submitted').count()
@@ -803,6 +801,7 @@ def analytics():
         average_grade = db.session.query(func.avg(Assignment.grade)).filter(Assignment.user_id == current_user.id, Assignment.grade != None).scalar() or 0
 
         # Calculate submission timeline
+        assignments = Assignment.query.filter_by(user_id=current_user.id).all()
         submission_timeline = {}
         for assignment in assignments:
             if assignment.submitted_date:
@@ -813,9 +812,10 @@ def analytics():
         submission_counts = [submission_timeline[date] for date in submission_dates]
 
         # Calculate analytics data for each course
+        courses = Course.query.filter_by(user_id=current_user.id).all()
         analytics_data = []
         for course in courses:
-            course_assignments = [a for a in assignments if a.course_id == course.id]
+            course_assignments = Assignment.query.filter_by(user_id=current_user.id, course_id=course.id).all()
             total_course_assignments = len(course_assignments)
             submitted_course_assignments = sum(1 for a in course_assignments if a.status in ['Submitted', 'Graded'])
             completion_rate = (submitted_course_assignments / total_course_assignments * 100) if total_course_assignments > 0 else 0
@@ -850,14 +850,24 @@ def analytics():
             if assignment.due_date:
                 workload_distribution[assignment.due_date.weekday()] += 1
 
-        chart_data = {}  # Define chart_data variable
+        chart_data = {
+            'submissionTimeline': {
+                'dates': [date.strftime('%Y-%m-%d') for date in submission_dates],
+                'counts': submission_counts
+            },
+            'courseNames': [course['course_name'] for course in analytics_data],
+            'completionRates': [course['completion_rate'] for course in analytics_data],
+            'gradeDistribution': grade_distribution,
+            'workloadDistribution': workload_distribution
+    }
+
         return render_template('analytics.html',
-                               total_courses=total_courses,
-                               total_assignments=total_assignments,
-                               overall_completion_rate=overall_completion_rate,
-                               average_grade=average_grade,
-                               analytics_data=analytics_data,
-                               analyticsData=json.dumps(chart_data))
+                           total_courses=total_courses,
+                           total_assignments=total_assignments,
+                           overall_completion_rate=overall_completion_rate,
+                           average_grade=average_grade,
+                           analytics_data=analytics_data,
+                           chart_data=json.dumps(chart_data))
     except Exception as e:
         logger.error(f"Error in analytics route: {str(e)}", exc_info=True)
         flash("Failed to load analytics. Please try again later.", "error")

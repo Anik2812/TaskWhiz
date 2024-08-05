@@ -1,55 +1,69 @@
 {% extends "base.html" %}
-
 {% block title %}Assignments{% endblock %}
-
 {% block content %}
 <div class="assignments-container">
-    <h1 class="fade-in">Assignments</h1>
-    
-    <div class="filters">
-        <select id="course-filter">
-            <option value="">All Courses</option>
-            {% for course in courses %}
-            <option value="{{ course.name }}">{{ course.name }}</option>
-            {% endfor %}
-        </select>
-        <select id="status-filter">
-            <option value="">All Statuses</option>
-            <option value="not submitted">Not Submitted</option>
-            <option value="submitted">Submitted</option>
-            <option value="graded">Graded</option>
-        </select>
-        <select id="sort-filter">
-            <option value="due_date_asc">Due Date (Ascending)</option>
-            <option value="due_date_desc">Due Date (Descending)</option>
-            <option value="title_asc">Title (A-Z)</option>
-            <option value="title_desc">Title (Z-A)</option>
-        </select>
+    <h1 class="page-title fade-in"><i class="fas fa-tasks"></i> Assignments</h1>
+   
+    <div class="search-filter">
+        <div class="filter-group">
+            <label for="course-filter">Course:</label>
+            <select id="course-filter">
+                <option value="">All Courses</option>
+                {% for course in courses %}
+                <option value="{{ course.name }}">{{ course.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="status-filter">Status:</label>
+            <select id="status-filter">
+                <option value="">All Statuses</option>
+                <option value="not submitted">Not Submitted</option>
+                <option value="submitted">Submitted</option>
+                <option value="graded">Graded</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="sort-filter">Sort By:</label>
+            <select id="sort-filter">
+                <option value="due_date_asc">Due Date (Ascending)</option>
+                <option value="due_date_desc">Due Date (Descending)</option>
+                <option value="title_asc">Title (A-Z)</option>
+                <option value="title_desc">Title (Z-A)</option>
+            </select>
+        </div>
     </div>
 
-    <div id="assignments-grid">
+    <div id="assignments" class="assignments-grid">
         {% for assignment in assignments %}
         <div class="assignment-card" data-assignment-id="{{ assignment.id }}">
-            <h2>{{ assignment.title }}</h2>
-            <p class="assignment-course">{{ assignment.course }}</p>
-            <p class="assignment-due-date">Due: {{ assignment.due_date }}</p>
-            <p class="assignment-status status-{{ assignment.status|lower|replace(' ', '-') }}">
-                <i class="fas fa-circle"></i> {{ assignment.status }}
+            <div class="assignment-header">
+                <h2 class="assignment-title">{{ assignment.title }}</h2>
+                <span class="assignment-status status-{{ assignment.status|lower|replace(' ', '-') }}">
+                    <i class="fas fa-circle"></i> {{ assignment.status }}
+                </span>
+            </div>
+            <p class="assignment-course"><i class="fas fa-book"></i> {{ assignment.course }}</p>
+            <p class="assignment-due-date"><i class="far fa-calendar-alt"></i> Due: {{ assignment.due_date }}</p>
+            {% if assignment.grade is not none %}
+            <p class="assignment-grade">
+                <i class="fas fa-star"></i> Grade: <span>{{ assignment.grade }}/{{ assignment.total_marks }}</span>
             </p>
+            {% endif %}
             <div class="card-actions">
                 <button class="btn btn-primary view-details" data-assignment-id="{{ assignment.id }}">
                     <i class="fas fa-eye"></i> View Details
                 </button>
                 {% if assignment.status == 'Not Submitted' %}
-                <form class="submit-form">
-                    <input type="file" id="file-{{ assignment.id }}" class="file-input" data-assignment-id="{{ assignment.id }}" style="display: none;">
+                <div class="file-upload">
+                    <input type="file" id="file-{{ assignment.id }}" class="file-input" data-assignment-id="{{ assignment.id }}" hidden>
                     <label for="file-{{ assignment.id }}" class="btn btn-secondary">
                         <i class="fas fa-file-upload"></i> Choose File
                     </label>
-                    <button type="submit" class="btn btn-primary submit-btn" data-assignment-id="{{ assignment.id }}">
-                        <i class="fas fa-paper-plane"></i> Submit
-                    </button>
-                </form>
+                </div>
+                <button type="submit" class="btn btn-primary submit-btn" data-assignment-id="{{ assignment.id }}">
+                    <i class="fas fa-paper-plane"></i> Submit
+                </button>
                 {% elif assignment.status == 'Submitted' %}
                 <button class="btn btn-secondary open-assignment" data-assignment-id="{{ assignment.id }}">
                     <i class="fas fa-folder-open"></i> Open
@@ -61,7 +75,6 @@
     </div>
 </div>
 {% endblock %}
-
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/assignments.js') }}"></script>
 {% endblock %}

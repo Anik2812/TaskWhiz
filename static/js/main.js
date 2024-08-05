@@ -332,10 +332,10 @@ document.addEventListener('DOMContentLoaded', function () {
         new Chart(ctx, {
             type: 'line',
             data: {
-                labels: analyticsData.submissionTimeline,
+                labels: chartData.submissionTimeline.dates,
                 datasets: [{
                     label: 'Submissions',
-                    data: analyticsData.submissionCounts,
+                    data: chartData.submissionTimeline.counts,
                     borderColor: 'rgb(75, 192, 192)',
                     tension: 0.1
                 }]
@@ -355,10 +355,10 @@ document.addEventListener('DOMContentLoaded', function () {
         new Chart(ctx2, {
             type: 'bar',
             data: {
-                labels: analyticsData.courseNames,
+                labels: chartData.courseNames,
                 datasets: [{
                     label: 'Completion Rate (%)',
-                    data: analyticsData.completionRates,
+                    data: chartData.completionRates,
                     backgroundColor: 'rgba(75, 192, 192, 0.6)'
                 }]
             },
@@ -380,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function () {
             data: {
                 labels: ['A', 'B', 'C', 'D', 'F'],
                 datasets: [{
-                    data: analyticsData.gradeDistribution,
+                    data: chartData.gradeDistribution,
                     backgroundColor: [
                         'rgba(75, 192, 192, 0.6)',
                         'rgba(54, 162, 235, 0.6)',
@@ -408,7 +408,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 labels: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
                 datasets: [{
                     label: 'Assignment Due Dates',
-                    data: analyticsData.workloadDistribution,
+                    data: chartData.workloadDistribution,
                     fill: true,
                     backgroundColor: 'rgba(255, 99, 132, 0.2)',
                     borderColor: 'rgb(255, 99, 132)',
@@ -437,6 +437,8 @@ document.addEventListener('DOMContentLoaded', function () {
             paging: true
         });
     }
+    
+    document.addEventListener('DOMContentLoaded', initializeAnalytics);
 
     function getCsrfToken() {
         const cookies = document.cookie.split(';');
