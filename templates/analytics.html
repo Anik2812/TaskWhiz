@@ -3,47 +3,37 @@
 {% block title %}Analytics Dashboard{% endblock %}
 
 {% block content %}
+{% if current_user.is_authenticated %}
 <div class="analytics-container">
-    <h1 class="fade-in">Analytics Dashboard</h1>
-    <div class="analytics-summary">
-        <div class="summary-card">
-            <h3>Total Courses</h3>
-            <p>{{ total_courses }}</p>
-        </div>
-        <div class="summary-card">
-            <h3>Total Assignments</h3>
-            <p>{{ total_assignments }}</p>
-        </div>
-        <div class="summary-card">
-            <h3>Overall Completion Rate</h3>
-            <p>{{ overall_completion_rate|round(2) }}%</p>
-        </div>
-        <div class="summary-card">
-            <h3>Avg. Grade</h3>
-            <p>{{ average_grade|round(2) }}</p>
-        </div>
+    <h1>Analytics Dashboard</h1>
+    
+    <div class="overview">
+        <h2>Overview</h2>
+        <p>Total Courses: {{ total_courses }}</p>
+        <p>Total Assignments: {{ total_assignments }}</p>
+        <p>Overall Completion Rate: {{ "%.2f"|format(overall_completion_rate) }}%</p>
+        <p>Average Grade: {{ "%.2f"|format(average_grade) }}</p>
     </div>
-    <div class="analytics-charts">
+
+    <div class="charts">
+        <h2>Charts</h2>
         <div class="chart-container">
-            <h2>Submission Timeline</h2>
-            <canvas id="submissionChart"></canvas>
+            <canvas id="submissionTimelineChart"></canvas>
         </div>
         <div class="chart-container">
-            <h2>Course Completion Rates</h2>
-            <canvas id="completionChart"></canvas>
+            <canvas id="courseCompletionChart"></canvas>
         </div>
         <div class="chart-container">
-            <h2>Grade Distribution</h2>
             <canvas id="gradeDistributionChart"></canvas>
         </div>
         <div class="chart-container">
-            <h2>Workload Distribution</h2>
             <canvas id="workloadDistributionChart"></canvas>
         </div>
     </div>
-    <div class="analytics-table">
-        <h2>Course Details</h2>
-        <table id="courseDetailsTable">
+
+    <div class="course-analytics">
+        <h2>Course Analytics</h2>
+        <table id="courseAnalyticsTable" class="display">
             <thead>
                 <tr>
                     <th>Course Name</th>
@@ -59,22 +49,28 @@
                     <td>{{ course.course_name }}</td>
                     <td>{{ course.total_assignments }}</td>
                     <td>{{ course.submitted_assignments }}</td>
-                    <td>{{ course.completion_rate|round(2) }}%</td>
-                    <td>{{ course.average_grade|round(2) }}</td>
+                    <td>{{ "%.2f"|format(course.completion_rate) }}%</td>
+                    <td>{{ "%.2f"|format(course.average_grade) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+{% else %}
+    <div class="alert alert-warning">
+        Please <a href="{{ url_for('authorize') }}">log in</a> to view analytics.
+    </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
+{% if current_user.is_authenticated %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
 <script>
-    var analytics_data = JSON.parse('{{ analyticsData|tojson|safe }}');
-    var chartData = JSON.parse('{{ chartData|tojson|safe }}');
+    var chartData = JSON.parse('{{ chart_data|safe }}');
 </script>
 <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+{% endif %}
 {% endblock %}

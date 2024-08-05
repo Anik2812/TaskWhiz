@@ -66,6 +66,11 @@ limiter.init_app(app)
 # Setup database connection
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///taskwhiz.db'
 db = SQLAlchemy(app)
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 10,
+    'pool_recycle': 60,
+    'pool_pre_ping': True
+}
 
 # User model
 class User(db.Model, UserMixin):
@@ -660,26 +665,22 @@ def create_course():
 @app.route('/analytics')
 @login_required
 def analytics():
-    if not current_user.is_authenticated:
-        flash("Please log in to view analytics.", "error")
-        return redirect(url_for('authorize'))
-
     try:
+        # Fetch basic statistics
         total_courses = Course.query.filter_by(user_id=current_user.id).count()
-        logger.debug(f"Total courses: {total_courses}")
-
         total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
-        logger.debug(f"Total assignments: {total_assignments}")
-
         completed_assignments = Assignment.query.filter_by(user_id=current_user.id, status='Submitted').count()
-        logger.debug(f"Completed assignments: {completed_assignments}")
-
+        
+        # Calculate overall completion rate safely
         overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
-        logger.debug(f"Overall completion rate: {overall_completion_rate}")
+        
+        # Calculate average grade safely
+        average_grade = db.session.query(func.avg(Assignment.grade)).filter(
+            Assignment.user_id == current_user.id, 
+            Assignment.grade != None
+        ).scalar() or 0
 
-        average_grade = db.session.query(func.avg(Assignment.grade)).filter(Assignment.user_id == current_user.id, Assignment.grade != None).scalar() or 0
-        logger.debug(f"Average grade: {average_grade}")
-
+        # Fetch submission timeline data
         assignments = Assignment.query.filter_by(user_id=current_user.id).all()
         submission_timeline = {}
         for assignment in assignments:
@@ -688,10 +689,9 @@ def analytics():
                 submission_timeline[date] = submission_timeline.get(date, 0) + 1
 
         submission_dates = sorted(submission_timeline.keys())[-30:]  # Last 30 days
-        submission_counts = [submission_timeline[date] for date in submission_dates]
-        logger.debug(f"Submission dates: {submission_dates}")
-        logger.debug(f"Submission counts: {submission_counts}")
+        submission_counts = [submission_timeline.get(date, 0) for date in submission_dates]
 
+        # Fetch course-specific data
         courses = Course.query.filter_by(user_id=current_user.id).all()
         analytics_data = []
         for course in courses:
@@ -699,7 +699,8 @@ def analytics():
             total_course_assignments = len(course_assignments)
             submitted_course_assignments = sum(1 for a in course_assignments if a.status in ['Submitted', 'Graded'])
             completion_rate = (submitted_course_assignments / total_course_assignments * 100) if total_course_assignments > 0 else 0
-            average_course_grade = sum(a.grade for a in course_assignments if a.grade is not None) / sum(1 for a in course_assignments if a.grade is not None) if any(a.grade is not None for a in course_assignments) else 0
+            course_grades = [a.grade for a in course_assignments if a.grade is not None]
+            average_course_grade = sum(course_grades) / len(course_grades) if course_grades else 0
 
             analytics_data.append({
                 'course_name': course.name,
@@ -708,29 +709,8 @@ def analytics():
                 'completion_rate': completion_rate,
                 'average_grade': average_course_grade
             })
-        logger.debug(f"Analytics data: {analytics_data}")
 
-        grade_distribution = [0, 0, 0, 0, 0]  # A, B, C, D, F
-        for assignment in assignments:
-            if assignment.grade is not None:
-                if assignment.grade >= 90:
-                    grade_distribution[0] += 1
-                elif assignment.grade >= 80:
-                    grade_distribution[1] += 1
-                elif assignment.grade >= 70:
-                    grade_distribution[2] += 1
-                elif assignment.grade >= 60:
-                    grade_distribution[3] += 1
-                else:
-                    grade_distribution[4] += 1
-        logger.debug(f"Grade distribution: {grade_distribution}")
-
-        workload_distribution = [0] * 7  # Mon to Sun
-        for assignment in assignments:
-            if assignment.due_date:
-                workload_distribution[assignment.due_date.weekday()] += 1
-        logger.debug(f"Workload distribution: {workload_distribution}")
-
+        # Prepare chart data
         chart_data = {
             'submissionTimeline': {
                 'dates': [date.strftime('%Y-%m-%d') for date in submission_dates],
@@ -738,10 +718,9 @@ def analytics():
             },
             'courseNames': [course['course_name'] for course in analytics_data],
             'completionRates': [course['completion_rate'] for course in analytics_data],
-            'gradeDistribution': grade_distribution,
-            'workloadDistribution': workload_distribution
+            'gradeDistribution': [0, 0, 0, 0, 0],  # Placeholder for grade distribution
+            'workloadDistribution': [0] * 7  # Placeholder for workload distribution
         }
-        logger.debug(f"Chart data: {chart_data}")
 
         return render_template('analytics.html',
                                total_courses=total_courses,
@@ -750,10 +729,40 @@ def analytics():
                                average_grade=average_grade,
                                analytics_data=analytics_data,
                                chart_data=json.dumps(chart_data))
+
     except Exception as e:
         logger.error(f"Error in analytics route: {str(e)}", exc_info=True)
-        flash("Failed to load analytics. Please try again later.", "error")
-        return redirect(url_for('dashboard'))
+        try:
+            total_courses = Course.query.filter_by(user_id=current_user.id).count()
+            total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
+            
+            return render_template('basic_analytics.html',
+                                   total_courses=total_courses,
+                                   total_assignments=total_assignments)
+        except Exception as inner_e:
+            logger.error(f"Error in fallback analytics: {str(inner_e)}", exc_info=True)
+            flash("Unable to load analytics at this time. Please try again later.", "error")
+            return redirect(url_for('dashboard'))
+
+def check_database_health():
+    try:
+        # Perform a simple query
+        User.query.first()
+        return True
+    except Exception as e:
+        logger.error(f"Database health check failed: {str(e)}")
+        return False
+
+# Run this check periodically (e.g., every 5 minutes)
+schedule.every(5).minutes.do(check_database_health)
+
+import sqlalchemy
+
+@app.errorhandler(sqlalchemy.exc.SQLAlchemyError)
+def handle_db_error(e):
+    logger.error(f"Database error: {str(e)}")
+    return render_template('db_error.html'), 500
+
 
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -782,19 +791,10 @@ def analytics():
 
     try:
         total_courses = Course.query.filter_by(user_id=current_user.id).count()
-        logger.debug(f"Total courses: {total_courses}")
-
         total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
-        logger.debug(f"Total assignments: {total_assignments}")
-
         completed_assignments = Assignment.query.filter_by(user_id=current_user.id, status='Submitted').count()
-        logger.debug(f"Completed assignments: {completed_assignments}")
-
         overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
-        logger.debug(f"Overall completion rate: {overall_completion_rate}")
-
         average_grade = db.session.query(func.avg(Assignment.grade)).filter(Assignment.user_id == current_user.id, Assignment.grade != None).scalar() or 0
-        logger.debug(f"Average grade: {average_grade}")
 
         assignments = Assignment.query.filter_by(user_id=current_user.id).all()
         submission_timeline = {}
@@ -805,8 +805,6 @@ def analytics():
 
         submission_dates = sorted(submission_timeline.keys())[-30:]  # Last 30 days
         submission_counts = [submission_timeline[date] for date in submission_dates]
-        logger.debug(f"Submission dates: {submission_dates}")
-        logger.debug(f"Submission counts: {submission_counts}")
 
         courses = Course.query.filter_by(user_id=current_user.id).all()
         analytics_data = []
@@ -824,28 +822,6 @@ def analytics():
                 'completion_rate': completion_rate,
                 'average_grade': average_course_grade
             })
-        logger.debug(f"Analytics data: {analytics_data}")
-
-        grade_distribution = [0, 0, 0, 0, 0]  # A, B, C, D, F
-        for assignment in assignments:
-            if assignment.grade is not None:
-                if assignment.grade >= 90:
-                    grade_distribution[0] += 1
-                elif assignment.grade >= 80:
-                    grade_distribution[1] += 1
-                elif assignment.grade >= 70:
-                    grade_distribution[2] += 1
-                elif assignment.grade >= 60:
-                    grade_distribution[3] += 1
-                else:
-                    grade_distribution[4] += 1
-        logger.debug(f"Grade distribution: {grade_distribution}")
-
-        workload_distribution = [0] * 7  # Mon to Sun
-        for assignment in assignments:
-            if assignment.due_date:
-                workload_distribution[assignment.due_date.weekday()] += 1
-        logger.debug(f"Workload distribution: {workload_distribution}")
 
         chart_data = {
             'submissionTimeline': {
@@ -854,10 +830,9 @@ def analytics():
             },
             'courseNames': [course['course_name'] for course in analytics_data],
             'completionRates': [course['completion_rate'] for course in analytics_data],
-            'gradeDistribution': grade_distribution,
-            'workloadDistribution': workload_distribution
+            'gradeDistribution': [0, 0, 0, 0, 0],  # Placeholder for grade distribution
+            'workloadDistribution': [0] * 7  # Placeholder for workload distribution
         }
-        logger.debug(f"Chart data: {chart_data}")
 
         return render_template('analytics.html',
                                total_courses=total_courses,
