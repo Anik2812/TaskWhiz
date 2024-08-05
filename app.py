@@ -33,6 +33,8 @@ from flask_cors import CORS
 from flask_talisman import Talisman
 from flask_login import LoginManager, current_user, login_user, logout_user, login_required, UserMixin
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+
 
 # Enhanced logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s')
@@ -53,6 +55,7 @@ Talisman(app, content_security_policy=csp)
 app.config.from_object(Config)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
 
+
 # Enable CORS
 CORS(app)
 
@@ -66,6 +69,9 @@ limiter.init_app(app)
 # Setup database connection
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///taskwhiz.db'
 db = SQLAlchemy(app)
+
+migrate = Migrate(app, db)
+
 
 # User model
 class User(db.Model, UserMixin):
@@ -92,6 +98,7 @@ class Assignment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey('course.id'), nullable=False)
     submitted_date = db.Column(db.DateTime)
+
 
 # Course model
 class Course(db.Model):
@@ -661,6 +668,7 @@ def create_course():
 @login_required
 def analytics():
     try:
+        logger.info(f"Starting analytics for user {current_user.id}")
         # Fetch basic statistics
         total_courses = Course.query.filter_by(user_id=current_user.id).count()
         total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
@@ -716,6 +724,7 @@ def analytics():
             'gradeDistribution': [0, 0, 0, 0, 0],  # Placeholder for grade distribution
             'workloadDistribution': [0] * 7  # Placeholder for workload distribution
         }
+        logger.info(f"Successfully rendered analytics for user {current_user.id}")
 
         return render_template('analytics.html',
                                total_courses=total_courses,
@@ -751,85 +760,85 @@ def internal_server_error(e):
 
 if __name__ == '__main__':
     app.run(debug=True, ssl_context='adhoc')
-def analytics():
-    if not current_user.is_authenticated:
-        flash("Please log in to view analytics.", "error")
-        return redirect(url_for('authorize'))
+# def analytics():
+#     if not current_user.is_authenticated:
+#         flash("Please log in to view analytics.", "error")
+#         return redirect(url_for('authorize'))
 
-    try:
-        total_courses = Course.query.filter_by(user_id=current_user.id).count()
-        total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
-        completed_assignments = Assignment.query.filter_by(user_id=current_user.id, status='Submitted').count()
-        overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
-        average_grade = db.session.query(func.avg(Assignment.grade)).filter(Assignment.user_id == current_user.id, Assignment.grade != None).scalar() or 0
+#     try:
+#         total_courses = Course.query.filter_by(user_id=current_user.id).count()
+#         total_assignments = Assignment.query.filter_by(user_id=current_user.id).count()
+#         completed_assignments = Assignment.query.filter_by(user_id=current_user.id, status='Submitted').count()
+#         overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
+#         average_grade = db.session.query(func.avg(Assignment.grade)).filter(Assignment.user_id == current_user.id, Assignment.grade != None).scalar() or 0
 
-        assignments = Assignment.query.filter_by(user_id=current_user.id).all()
-        submission_timeline = {}
-        for assignment in assignments:
-            if assignment.submitted_date:
-                date = assignment.submitted_date.date()
-                submission_timeline[date] = submission_timeline.get(date, 0) + 1
+#         assignments = Assignment.query.filter_by(user_id=current_user.id).all()
+#         submission_timeline = {}
+#         for assignment in assignments:
+#             if assignment.submitted_date:
+#                 date = assignment.submitted_date.date()
+#                 submission_timeline[date] = submission_timeline.get(date, 0) + 1
 
-        submission_dates = sorted(submission_timeline.keys())[-30:]  # Last 30 days
-        submission_counts = [submission_timeline[date] for date in submission_dates]
+#         submission_dates = sorted(submission_timeline.keys())[-30:]  # Last 30 days
+#         submission_counts = [submission_timeline[date] for date in submission_dates]
 
-        courses = Course.query.filter_by(user_id=current_user.id).all()
-        analytics_data = []
-        for course in courses:
-            course_assignments = Assignment.query.filter_by(user_id=current_user.id, course_id=course.id).all()
-            total_course_assignments = len(course_assignments)
-            submitted_course_assignments = sum(1 for a in course_assignments if a.status in ['Submitted', 'Graded'])
-            completion_rate = (submitted_course_assignments / total_course_assignments * 100) if total_course_assignments > 0 else 0
-            average_course_grade = sum(a.grade for a in course_assignments if a.grade is not None) / sum(1 for a in course_assignments if a.grade is not None) if any(a.grade is not None for a in course_assignments) else 0
+#         courses = Course.query.filter_by(user_id=current_user.id).all()
+#         analytics_data = []
+#         for course in courses:
+#             course_assignments = Assignment.query.filter_by(user_id=current_user.id, course_id=course.id).all()
+#             total_course_assignments = len(course_assignments)
+#             submitted_course_assignments = sum(1 for a in course_assignments if a.status in ['Submitted', 'Graded'])
+#             completion_rate = (submitted_course_assignments / total_course_assignments * 100) if total_course_assignments > 0 else 0
+#             average_course_grade = sum(a.grade for a in course_assignments if a.grade is not None) / sum(1 for a in course_assignments if a.grade is not None) if any(a.grade is not None for a in course_assignments) else 0
 
-            analytics_data.append({
-                'course_name': course.name,
-                'total_assignments': total_course_assignments,
-                'submitted_assignments': submitted_course_assignments,
-                'completion_rate': completion_rate,
-                'average_grade': average_course_grade
-            })
+#             analytics_data.append({
+#                 'course_name': course.name,
+#                 'total_assignments': total_course_assignments,
+#                 'submitted_assignments': submitted_course_assignments,
+#                 'completion_rate': completion_rate,
+#                 'average_grade': average_course_grade
+#             })
 
-        chart_data = {
-            'submissionTimeline': {
-                'dates': [date.strftime('%Y-%m-%d') for date in submission_dates],
-                'counts': submission_counts
-            },
-            'courseNames': [course['course_name'] for course in analytics_data],
-            'completionRates': [course['completion_rate'] for course in analytics_data],
-            'gradeDistribution': [0, 0, 0, 0, 0],  # Placeholder for grade distribution
-            'workloadDistribution': [0] * 7  # Placeholder for workload distribution
-        }
+#         chart_data = {
+#             'submissionTimeline': {
+#                 'dates': [date.strftime('%Y-%m-%d') for date in submission_dates],
+#                 'counts': submission_counts
+#             },
+#             'courseNames': [course['course_name'] for course in analytics_data],
+#             'completionRates': [course['completion_rate'] for course in analytics_data],
+#             'gradeDistribution': [0, 0, 0, 0, 0],  # Placeholder for grade distribution
+#             'workloadDistribution': [0] * 7  # Placeholder for workload distribution
+#         }
 
-        return render_template('analytics.html',
-                               total_courses=total_courses,
-                               total_assignments=total_assignments,
-                               overall_completion_rate=overall_completion_rate,
-                               average_grade=average_grade,
-                               analytics_data=analytics_data,
-                               chart_data=json.dumps(chart_data))
-    except Exception as e:
-        logger.error(f"Error in analytics route: {str(e)}", exc_info=True)
-        flash("Failed to load analytics. Please try again later.", "error")
-        return redirect(url_for('dashboard'))
+#         return render_template('analytics.html',
+#                                total_courses=total_courses,
+#                                total_assignments=total_assignments,
+#                                overall_completion_rate=overall_completion_rate,
+#                                average_grade=average_grade,
+#                                analytics_data=analytics_data,
+#                                chart_data=json.dumps(chart_data))
+#     except Exception as e:
+#         logger.error(f"Error in analytics route: {str(e)}", exc_info=True)
+#         flash("Failed to load analytics. Please try again later.", "error")
+#         return redirect(url_for('dashboard'))
 
-@app.errorhandler(Exception)
-def handle_exception(e):
-    app.logger.error(f"Unhandled exception: {str(e)}")
-    return jsonify({'error': 'An unexpected error occurred'}), 500
+# @app.errorhandler(Exception)
+# def handle_exception(e):
+#     app.logger.error(f"Unhandled exception: {str(e)}")
+#     return jsonify({'error': 'An unexpected error occurred'}), 500
 
-@app.errorhandler(RefreshError)
-def handle_refresh_error(e):
-    session.clear()
-    return redirect(url_for('authorize'))
+# @app.errorhandler(RefreshError)
+# def handle_refresh_error(e):
+#     session.clear()
+#     return redirect(url_for('authorize'))
 
-@app.errorhandler(404)
-def page_not_found(e):
-    return render_template('404.html'), 404
+# @app.errorhandler(404)
+# def page_not_found(e):
+#     return render_template('404.html'), 404
 
-@app.errorhandler(500)
-def internal_server_error(e):
-    return render_template('500.html'), 500
+# @app.errorhandler(500)
+# def internal_server_error(e):
+#     return render_template('500.html'), 500
 
-if __name__ == '__main__':
-    app.run(debug=True, ssl_context='adhoc')
+# if __name__ == '__main__':
+#     app.run(debug=True, ssl_context='adhoc')
