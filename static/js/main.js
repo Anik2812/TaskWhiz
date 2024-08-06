@@ -14,10 +14,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const showGithubTokenBtn = document.getElementById('show-github-token');
     const deleteAccountBtn = document.getElementById('delete-account');
     const deleteAccountModal = document.getElementById('delete-account-modal');
-
     const analyticsContainer = document.getElementById('analytics-container');
-
-
 
     // Theme toggle functionality
     function setupThemeToggle() {
@@ -45,10 +42,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 icon.classList.replace('fa-moon', 'fa-sun');
             }
         }
-    }
-
-    if (analyticsContainer) {
-        fetchAnalyticsData();
     }
 
     // Loading spinner functions
@@ -85,57 +78,59 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Assignment card functionality
-    if (assignmentCards.length > 0) {
-        assignmentCards.forEach(card => {
-            card.addEventListener('mouseenter', function () {
-                this.style.transform = 'scale(1.05)';
-                this.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.2)';
+    function setupAssignmentCards() {
+        if (assignmentCards.length > 0) {
+            assignmentCards.forEach(card => {
+                card.addEventListener('mouseenter', function () {
+                    this.style.transform = 'scale(1.05)';
+                    this.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.2)';
+                });
+                card.addEventListener('mouseleave', function () {
+                    this.style.transform = 'scale(1)';
+                    this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+                });
             });
-            card.addEventListener('mouseleave', function () {
-                this.style.transform = 'scale(1)';
-                this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+
+            // View Details functionality
+            document.querySelectorAll('.view-details').forEach(button => {
+                button.addEventListener('click', function () {
+                    const assignmentId = this.getAttribute('data-assignment-id');
+                    fetchAssignmentDetails(assignmentId);
+                });
             });
-        });
 
-        // View Details functionality
-        document.querySelectorAll('.view-details').forEach(button => {
-            button.addEventListener('click', function () {
-                const assignmentId = this.getAttribute('data-assignment-id');
-                fetchAssignmentDetails(assignmentId);
+            // Submit Assignment functionality
+            document.querySelectorAll('.submit-form').forEach(form => {
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    const assignmentId = this.querySelector('.submit-btn').getAttribute('data-assignment-id');
+                    const fileInput = this.querySelector('.file-input');
+
+                    if (!fileInput || fileInput.files.length === 0) {
+                        showNotification('Please select a file to upload.', 'error');
+                        return;
+                    }
+
+                    const formData = new FormData(this);
+                    formData.append('assignment_id', assignmentId);
+
+                    submitAssignment(formData);
+                });
             });
-        });
 
-        // Submit Assignment functionality
-        document.querySelectorAll('.submit-form').forEach(form => {
-            form.addEventListener('submit', function (e) {
-                e.preventDefault();
-                const assignmentId = this.querySelector('.submit-btn').getAttribute('data-assignment-id');
-                const fileInput = this.querySelector('.file-input');
-
-                if (!fileInput || fileInput.files.length === 0) {
-                    showNotification('Please select a file to upload.', 'error');
-                    return;
-                }
-
-                const formData = new FormData(this);
-                formData.append('assignment_id', assignmentId);
-
-                submitAssignment(formData);
+            // File input change event
+            document.querySelectorAll('.file-input').forEach(input => {
+                input.addEventListener('change', function (e) {
+                    const fileName = e.target.files[0].name;
+                    const assignmentId = this.dataset.assignmentId;
+                    const label = document.querySelector(`label[for="file-${assignmentId}"]`);
+                    if (label) {
+                        label.innerHTML = `<i class="fas fa-file"></i> ${fileName}`;
+                        label.classList.add('file-selected');
+                    }
+                });
             });
-        });
-
-        // File input change event
-        document.querySelectorAll('.file-input').forEach(input => {
-            input.addEventListener('change', function (e) {
-                const fileName = e.target.files[0].name;
-                const assignmentId = this.dataset.assignmentId;
-                const label = document.querySelector(`label[for="file-${assignmentId}"]`);
-                if (label) {
-                    label.innerHTML = `<i class="fas fa-file"></i> ${fileName}`;
-                    label.classList.add('file-selected');
-                }
-            });
-        });
+        }
     }
 
     // Fetch assignment details
@@ -209,26 +204,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return new Date(dateString).toLocaleDateString(undefined, options);
     }
 
-    function fetchAnalyticsData() {
-        showLoadingSpinner();
-        fetch('/analytics')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                hideLoadingSpinner();
-                renderAnalytics(data);
-            })
-            .catch(error => {
-                hideLoadingSpinner();
-                console.error('Error fetching analytics:', error);
-                showNotification('Failed to load analytics. Please try again later.', 'error');
-            });
-    }
-
     // Submit assignment
     function submitAssignment(formData) {
         showLoadingSpinner();
@@ -252,28 +227,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 showNotification('An error occurred. Please try again.', 'error');
             });
     }
-
-    document.querySelectorAll('.open-assignment').forEach(button => {
-        button.addEventListener('click', function () {
-            const assignmentId = this.getAttribute('data-assignment-id');
-            showLoadingSpinner();
-            fetch(`/open_assignment/${assignmentId}`)
-                .then(response => response.json())
-                .then(data => {
-                    hideLoadingSpinner();
-                    if (data.success && data.file_url) {
-                        window.open(data.file_url, '_blank');
-                    } else {
-                        showNotification(data.message || 'Error opening assignment. Please try again.', 'error');
-                    }
-                })
-                .catch(error => {
-                    hideLoadingSpinner();
-                    console.error('Error:', error);
-                    showNotification('An error occurred. Please try again.', 'error');
-                });
-        });
-    });
 
     // Update assignment status
     function updateAssignmentStatus(assignmentId, status) {
@@ -337,29 +290,120 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Settings page functionality
-    if (showGithubTokenBtn) {
-        showGithubTokenBtn.addEventListener('click', function () {
-            const githubTokenInput = document.getElementById('github_token');
-            if (githubTokenInput.type === 'password') {
-                githubTokenInput.type = 'text';
-                this.textContent = 'Hide';
-            } else {
-                githubTokenInput.type = 'password';
-                this.textContent = 'Show';
-            }
+    function setupSettingsPage() {
+        if (showGithubTokenBtn) {
+            showGithubTokenBtn.addEventListener('click', function () {
+                const githubTokenInput = document.getElementById('github_token');
+                if (githubTokenInput.type === 'password') {
+                    githubTokenInput.type = 'text';
+                    this.textContent = 'Hide';
+                } else {
+                    githubTokenInput.type = 'password';
+                    this.textContent = 'Show';
+                }
+            });
+        }
+
+        if (deleteAccountBtn && deleteAccountModal) {
+            const confirmDeleteBtn = document.getElementById('confirm-delete');
+            const cancelDeleteBtn = document.getElementById('cancel-delete');
+
+            deleteAccountBtn.addEventListener('click', () => {
+                deleteAccountModal.style.display = 'block';
+            });
+
+            cancelDeleteBtn.addEventListener('click', () => {
+                deleteAccountModal.style.display = 'none';
+            });
+
+            confirmDeleteBtn.addEventListener('click', () => {
+                showLoadingSpinner();
+                fetch('/delete_account', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        hideLoadingSpinner();
+                        if (data.success) {
+                            showNotification('Account deleted successfully. Redirecting...', 'success');
+                            setTimeout(() => {
+                                window.location.href = '/logout';
+                            }, 2000);
+                        } else {
+                            showNotification(data.message || 'Error deleting account. Please try again.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        hideLoadingSpinner();
+                        console.error('Error:', error);
+                        showNotification('An error occurred. Please try again.', 'error');
+                    });
+                deleteAccountModal.style.display = 'none';
+            });
+        }
+    }
+
+    // Populate time zone options
+    function populateTimeZones() {
+        if (timeZoneSelect) {
+            const timeZones = moment.tz.names();
+            timeZones.forEach(zone => {
+                const option = document.createElement('option');
+                option.value = zone;
+                option.textContent = zone;
+                timeZoneSelect.appendChild(option);
+            });
+        }
+    }
+
+    // Course details toggle
+    function setupCourseDetailsToggle() {
+        const courseToggleDetailsBtns = document.querySelectorAll('.course .toggle-details');
+        courseToggleDetailsBtns.forEach(btn => {
+            btn.addEventListener('click', function () {
+                const details = this.closest('.course').querySelector('.course-details');
+                if (details.style.display === 'none') {
+                    details.style.display = 'block';
+                    this.textContent = 'Less Details';
+                } else {
+                    details.style.display = 'none';
+                    this.textContent = 'More Details';
+                }
+            });
         });
     }
 
+    // Check authentication status
+    function checkAuthStatus() {
+        fetch('/check_auth_status')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.authenticated) {
+                    showNotification('Your session has expired. Please log in again.', 'warning');
+                    setTimeout(() => {
+                        window.location.href = '/authorize';
+                    }, 2000);
+                }
+            })
+            .catch(error => {
+                console.error('Error checking auth status:', error);
+                showNotification('An error occurred. Please refresh the page.', 'error');
+            });
+    }
 
-
+    // Analytics functionality
     let analyticsCharts = {};
 
     function initializeAnalytics() {
         console.log('Initializing analytics...');
-        updateAnalytics();
+        fetchAnalyticsData();
     }
 
-    function updateAnalytics() {
+    function fetchAnalyticsData() {
         console.log('Fetching analytics data...');
         document.getElementById('loading-message').style.display = 'block';
         document.getElementById('error-message').style.display = 'none';
@@ -382,8 +426,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     renderAnalytics(data);
                 }
-                // Display debug info
-                document.getElementById('debug-data').textContent = JSON.stringify(data, null, 2);
             })
             .catch(error => {
                 console.error('Error fetching analytics data:', error);
@@ -440,53 +482,67 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function createCharts(data) {
-        analyticsCharts.submissionChart = new Chart(document.getElementById('submissionChart').getContext('2d'), {
-            type: 'line',
-            data: {
-                labels: Object.keys(data.submission_timeline),
-                datasets: [{
-                    label: 'Submissions',
-                    data: Object.values(data.submission_timeline),
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1
-                }]
-            },
-            options: { responsive: true, scales: { y: { beginAtZero: true } } }
-        });
-    
-        analyticsCharts.completionChart = new Chart(document.getElementById('completionChart').getContext('2d'), {
+    function createCompletionChart(courseData) {
+        const ctx = document.getElementById('completionChart').getContext('2d');
+        analyticsCharts.completionChart = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.course_analytics.map(course => course.course_name),
+                labels: courseData.map(course => course.course_name),
                 datasets: [{
                     label: 'Completion Rate (%)',
-                    data: data.course_analytics.map(course => course.completion_rate),
+                    data: courseData.map(course => course.completion_rate),
                     backgroundColor: 'rgba(75, 192, 192, 0.6)'
                 }]
             },
-            options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
         });
-    
-        analyticsCharts.gradeDistributionChart = new Chart(document.getElementById('gradeDistributionChart').getContext('2d'), {
+    }
+
+    function createGradeDistributionChart(gradeData) {
+        const ctx = document.getElementById('gradeDistributionChart').getContext('2d');
+        analyticsCharts.gradeDistributionChart = new Chart(ctx, {
             type: 'pie',
             data: {
                 labels: ['A', 'B', 'C', 'D', 'F'],
                 datasets: [{
-                    data: data.grade_distribution,
-                    backgroundColor: ['rgba(75, 192, 192, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(255, 206, 86, 0.6)', 'rgba(255, 159, 64, 0.6)', 'rgba(255, 99, 132, 0.6)']
+                    data: gradeData,
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 206, 86, 0.6)',
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(255, 99, 132, 0.6)'
+                    ]
                 }]
             },
-            options: { responsive: true, plugins: { legend: { position: 'top' } } }
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                }
+            }
         });
-    
-        analyticsCharts.workloadDistributionChart = new Chart(document.getElementById('workloadDistributionChart').getContext('2d'), {
+    }
+
+    function createWorkloadDistributionChart(workloadData) {
+        const ctx = document.getElementById('workloadDistributionChart').getContext('2d');
+        analyticsCharts.workloadDistributionChart = new Chart(ctx, {
             type: 'radar',
             data: {
                 labels: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
                 datasets: [{
                     label: 'Assignment Due Dates',
-                    data: data.workload_distribution,
+                    data: workloadData,
                     fill: true,
                     backgroundColor: 'rgba(255, 99, 132, 0.2)',
                     borderColor: 'rgb(255, 99, 132)',
@@ -496,19 +552,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     pointHoverBorderColor: 'rgb(255, 99, 132)'
                 }]
             },
-            options: { elements: { line: { borderWidth: 3 } } }
+            options: {
+                elements: {
+                    line: {
+                        borderWidth: 3
+                    }
+                }
+            }
         });
-    
-        // Initialize DataTable
-        $('#courseDetailsTable').DataTable({
-            pageLength: 10,
-            lengthChange: false,
-            searching: true,
-            ordering: true,
-            info: true,
-            paging: true
-        });
-
+    }
 
     function updateCourseAnalyticsTable(courseData) {
         const table = $('#courseDetailsTable').DataTable();
@@ -527,110 +579,6 @@ document.addEventListener('DOMContentLoaded', function () {
         table.draw();
     }
 
-
-    document.addEventListener('DOMContentLoaded', initializeAnalytics);
-
-
-
-    function getCsrfToken() {
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-            const [name, value] = cookie.trim().split('=');
-            if (name === 'csrf_token') {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    // Delete account functionality
-    if (deleteAccountBtn && deleteAccountModal) {
-        const confirmDeleteBtn = document.getElementById('confirm-delete');
-        const cancelDeleteBtn = document.getElementById('cancel-delete');
-
-        deleteAccountBtn.addEventListener('click', () => {
-            deleteAccountModal.style.display = 'block';
-        });
-
-        cancelDeleteBtn.addEventListener('click', () => {
-            deleteAccountModal.style.display = 'none';
-        });
-
-        confirmDeleteBtn.addEventListener('click', () => {
-            showLoadingSpinner();
-            fetch('/delete_account', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken() // Implement this function to get the CSRF token
-                }
-            })
-                .then(response => response.json())
-                .then(data => {
-                    hideLoadingSpinner();
-                    if (data.success) {
-                        showNotification('Account deleted successfully. Redirecting...', 'success');
-                        setTimeout(() => {
-                            window.location.href = '/logout';
-                        }, 2000);
-                    } else {
-                        showNotification(data.message || 'Error deleting account. Please try again.', 'error');
-                    }
-                })
-                .catch(error => {
-                    hideLoadingSpinner();
-                    console.error('Error:', error);
-                    showNotification('An error occurred. Please try again.', 'error');
-                });
-            deleteAccountModal.style.display = 'none';
-
-        });
-    }
-
-    // Populate time zone options
-    if (timeZoneSelect) {
-        const timeZones = moment.tz.names();
-        timeZones.forEach(zone => {
-            const option = document.createElement('option');
-            option.value = zone;
-            option.textContent = zone;
-            timeZoneSelect.appendChild(option);
-        });
-    }
-
-    // Course details toggle
-    const courseToggleDetailsBtns = document.querySelectorAll('.course .toggle-details');
-    courseToggleDetailsBtns.forEach(btn => {
-        btn.addEventListener('click', function () {
-            const details = this.closest('.course').querySelector('.course-details');
-            if (details.style.display === 'none') {
-                details.style.display = 'block';
-                this.textContent = 'Less Details';
-            } else {
-                details.style.display = 'none';
-                this.textContent = 'More Details';
-            }
-        });
-    });
-
-    // Check authentication status
-    function checkAuthStatus() {
-        fetch('/check_auth_status')
-            .then(response => response.json())
-            .then(data => {
-                if (!data.authenticated) {
-                    showNotification('Your session has expired. Please log in again.', 'warning');
-                    setTimeout(() => {
-                        window.location.href = '/authorize';
-                    }, 2000);
-                }
-            })
-            .catch(error => {
-                console.error('Error checking auth status:', error);
-                showNotification('An error occurred. Please refresh the page.', 'error');
-            });
-    }
-
     // Initialize components
     setupThemeToggle();
     applyTheme();
@@ -640,10 +588,8 @@ document.addEventListener('DOMContentLoaded', function () {
         sortFilter.addEventListener('change', applyFiltersAndSort);
         applyFiltersAndSort();
     }
+    setupCourseDetailsToggle();
     setInterval(checkAuthStatus, 5 * 60 * 1000); // Check auth status every 5 minutes
     initializeAnalytics();
     checkAuthStatus();
-
-}
-
 });

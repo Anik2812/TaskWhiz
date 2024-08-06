@@ -47,8 +47,8 @@ app = Flask(__name__, static_url_path='/static')
 CORS(app, resources={r"/*": {"origins": "*"}})
 csp = {
     'default-src': ['\'self\'', 'https://fonts.googleapis.com', 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com'],
-    'script-src': ['\'self\'', 'https://cdnjs.cloudflare.com', '\'unsafe-inline\''],
-    'style-src': ['\'self\'', 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com', '\'unsafe-inline\''],
+    'script-src': ['\'self\'', 'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net', 'https://cdn.datatables.net', 'https://code.jquery.com', '\'unsafe-inline\''],
+    'style-src': ['\'self\'', 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com', 'https://cdn.datatables.net', '\'unsafe-inline\''],
     'font-src': ['\'self\'', 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com'],
 }
 
