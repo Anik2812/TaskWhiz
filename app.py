@@ -34,6 +34,7 @@ from flask_talisman import Talisman
 from flask_login import LoginManager, current_user, login_user, logout_user, login_required, UserMixin
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from requests.exceptions import Timeout
 
 
 # Enhanced logging
@@ -43,6 +44,7 @@ logger = logging.getLogger(__name__)
 from config import Config
 
 app = Flask(__name__, static_url_path='/static')
+CORS(app, resources={r"/*": {"origins": "*"}})
 csp = {
     'default-src': ['\'self\'', 'https://fonts.googleapis.com', 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com'],
     'script-src': ['\'self\'', 'https://cdnjs.cloudflare.com', '\'unsafe-inline\''],
@@ -54,10 +56,6 @@ Talisman(app, content_security_policy=csp)
 
 app.config.from_object(Config)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
-
-
-# Enable CORS
-CORS(app)
 
 # Setup caching
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
@@ -279,11 +277,6 @@ def parse_due_date(due_date):
     if not due_date:
         return None
     return datetime(year=due_date.get('year', 1), month=due_date.get('month', 1), day=due_date.get('day', 1))
-
-def parse_date(date_string):
-    if not date_string:
-        return None
-    return datetime.fromisoformat(date_string.replace('Z', '+00:00'))
 
 def run_scheduler():
     while True:
@@ -669,44 +662,62 @@ def create_course():
 
     return render_template('create_course.html')
 
-def fetch_and_update_analytics():
-    while True:
-        with app.app_context():
+@app.route('/get_analytics_data')
+@login_required
+def get_analytics_data():
+    try:
+        analytics_data = fetch_analytics_data()
+        return jsonify(analytics_data)
+    except Exception as e:
+        logger.error(f"Error fetching analytics data: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+def fetch_analytics_data():
+    credentials = get_credentials()
+    if not credentials:
+        raise Exception("No valid credentials found")
+
+    classroom_service = build('classroom', 'v1', credentials=credentials)
+    
+    try:
+        courses_result = classroom_service.courses().list(pageSize=10).execute()
+        courses = courses_result.get('courses', [])
+        
+        logger.info(f"Fetched {len(courses)} courses")
+
+        all_assignments = []
+        submission_timeline = {}
+        grade_distribution = [0, 0, 0, 0, 0]  # A, B, C, D, F
+        workload_distribution = [0] * 7  # Mon to Sun
+
+        for course in courses:
             try:
-                credentials = get_credentials()
-                if not credentials:
-                    continue
+                course_work = classroom_service.courses().courseWork().list(courseId=course['id'], pageSize=20).execute()
+                assignments = course_work.get('courseWork', [])
+                
+                logger.info(f"Fetched {len(assignments)} assignments for course {course['name']}")
 
-                classroom_service = build('classroom', 'v1', credentials=credentials)
-                github_client = Github(app.config['GITHUB_TOKEN'])
-
-                courses = classroom_service.courses().list(pageSize=10).execute().get('courses', [])
-                all_assignments = []
-                submission_timeline = {}
-                grade_distribution = [0, 0, 0, 0, 0]  # A, B, C, D, F
-                workload_distribution = [0] * 7  # Mon to Sun
-
-                for course in courses:
-                    course_work = classroom_service.courses().courseWork().list(courseId=course['id']).execute().get('courseWork', [])
-                    for work in course_work:
+                for work in assignments:
+                    due_date = parse_due_date(work.get('dueDate', {}))
+                    
+                    try:
                         submissions = classroom_service.courses().courseWork().studentSubmissions().list(
                             courseId=course['id'],
                             courseWorkId=work['id'],
                             userId='me'
                         ).execute().get('studentSubmissions', [])
-
+                        
                         if submissions:
                             submission = submissions[0]
-                            due_date = parse_due_date(work.get('dueDate', {}))
-                            submitted_date = parse_date(submission.get('submissionTime'))
-
+                            submitted_date = parse_date(submission.get('creationTime'))
+                            
                             if submitted_date:
                                 date_key = submitted_date.strftime('%Y-%m-%d')
                                 submission_timeline[date_key] = submission_timeline.get(date_key, 0) + 1
-
+                            
                             if due_date:
                                 workload_distribution[due_date.weekday()] += 1
-
+                            
                             if 'assignedGrade' in submission:
                                 grade = int(submission['assignedGrade'])
                                 if grade >= 90:
@@ -719,60 +730,83 @@ def fetch_and_update_analytics():
                                     grade_distribution[3] += 1
                                 else:
                                     grade_distribution[4] += 1
-
+                        
                         all_assignments.append({
                             'id': work['id'],
                             'title': work['title'],
                             'course': course['name'],
                             'due_date': due_date.strftime('%Y-%m-%d') if due_date else 'No due date',
                             'status': submission['state'] if submissions else 'Not submitted',
-                            'grade': submission.get('assignedGrade', 'Not graded')
+                            'grade': submission.get('assignedGrade', 'Not graded') if submissions else 'Not graded'
                         })
+                    except HttpError as e:
+                        logger.error(f"Error fetching submissions for assignment {work['id']}: {str(e)}")
+                        continue
 
-                total_assignments = len(all_assignments)
-                completed_assignments = sum(1 for a in all_assignments if a['status'] in ['TURNED_IN', 'RETURNED'])
-                overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
+            except HttpError as e:
+                logger.error(f"Error fetching assignments for course {course['name']}: {str(e)}")
+                continue
 
-                analytics_data = {
-                    'total_courses': len(courses),
-                    'total_assignments': total_assignments,
-                    'overall_completion_rate': overall_completion_rate,
-                    'average_grade': sum(int(a['grade']) for a in all_assignments if a['grade'] != 'Not graded') / completed_assignments if completed_assignments > 0 else 0,
-                    'submission_timeline': dict(sorted(submission_timeline.items())),
-                    'grade_distribution': grade_distribution,
-                    'workload_distribution': workload_distribution,
-                    'course_analytics': [
-                        {
-                            'course_name': course['name'],
-                            'total_assignments': len([a for a in all_assignments if a['course'] == course['name']]),
-                            'submitted_assignments': len([a for a in all_assignments if a['course'] == course['name'] and a['status'] in ['TURNED_IN', 'RETURNED']]),
-                            'completion_rate': (len([a for a in all_assignments if a['course'] == course['name'] and a['status'] in ['TURNED_IN', 'RETURNED']]) / 
-                                                len([a for a in all_assignments if a['course'] == course['name']])) * 100 if len([a for a in all_assignments if a['course'] == course['name']]) > 0 else 0,
-                            'average_grade': sum(int(a['grade']) for a in all_assignments if a['course'] == course['name'] and a['grade'] != 'Not graded') / 
-                                             len([a for a in all_assignments if a['course'] == course['name'] and a['grade'] != 'Not graded']) if len([a for a in all_assignments if a['course'] == course['name'] and a['grade'] != 'Not graded']) > 0 else 0
-                        } for course in courses
-                    ]
-                }
+        total_assignments = len(all_assignments)
+        completed_assignments = sum(1 for a in all_assignments if a['status'] in ['TURNED_IN', 'RETURNED'])
+        overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
+        
+        graded_assignments = [a for a in all_assignments if a['grade'] != 'Not graded']
+        average_grade = sum(int(a['grade']) for a in graded_assignments) / len(graded_assignments) if graded_assignments else 0
 
-                app.analytics_data = analytics_data
-            except Exception as e:
-                logger.error(f"Error updating analytics: {str(e)}", exc_info=True)
+        course_analytics = []
+        for course in courses:
+            course_assignments = [a for a in all_assignments if a['course'] == course['name']]
+            total_course_assignments = len(course_assignments)
+            completed_course_assignments = sum(1 for a in course_assignments if a['status'] in ['TURNED_IN', 'RETURNED'])
+            completion_rate = (completed_course_assignments / total_course_assignments * 100) if total_course_assignments > 0 else 0
+            
+            graded_course_assignments = [a for a in course_assignments if a['grade'] != 'Not graded']
+            average_course_grade = sum(int(a['grade']) for a in graded_course_assignments) / len(graded_course_assignments) if graded_course_assignments else 0
+            
+            course_analytics.append({
+                'course_name': course['name'],
+                'total_assignments': total_course_assignments,
+                'submitted_assignments': completed_course_assignments,
+                'completion_rate': completion_rate,
+                'average_grade': average_course_grade
+            })
 
-        time.sleep(300)  # Update every 5 minutes
+        return {
+            'total_courses': len(courses),
+            'total_assignments': total_assignments,
+            'overall_completion_rate': overall_completion_rate,
+            'average_grade': average_grade,
+            'submission_timeline': dict(sorted(submission_timeline.items())),
+            'grade_distribution': grade_distribution,
+            'workload_distribution': workload_distribution,
+            'course_analytics': course_analytics
+        }
 
-analytics_thread = threading.Thread(target=fetch_and_update_analytics)
-analytics_thread.daemon = True
-analytics_thread.start()
+    except Timeout:
+        logger.error("Request to Google Classroom API timed out")
+        raise Exception("Request to Google Classroom API timed out. Please try again later.")
+    except HttpError as e:
+        logger.error(f"HTTP Error in fetch_analytics_data: {e}")
+        raise Exception(f"Failed to fetch data from Google Classroom API: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected error in fetch_analytics_data: {str(e)}")
+        raise Exception(f"An unexpected error occurred: {str(e)}")
 
-@app.route('/get_analytics_data')
-@login_required
-def get_analytics_data():
-    return jsonify(app.analytics_data if hasattr(app, 'analytics_data') else {})
+def parse_due_date(due_date):
+    if not due_date:
+        return None
+    return datetime(year=due_date.get('year', 1), month=due_date.get('month', 1), day=due_date.get('day', 1))
+
+def parse_date(date_string):
+    if not date_string:
+        return None
+    return datetime.strptime(date_string, "%Y-%m-%dT%H:%M:%S.%fZ")
 
 @app.route('/analytics')
 @login_required
 def analytics():
-    return render_template('analytics.html')
+    return render_template('analytics.html')   
         
 
 @app.errorhandler(Exception)

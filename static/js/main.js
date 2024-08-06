@@ -440,6 +440,75 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function createCharts(data) {
+        analyticsCharts.submissionChart = new Chart(document.getElementById('submissionChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: Object.keys(data.submission_timeline),
+                datasets: [{
+                    label: 'Submissions',
+                    data: Object.values(data.submission_timeline),
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: { responsive: true, scales: { y: { beginAtZero: true } } }
+        });
+    
+        analyticsCharts.completionChart = new Chart(document.getElementById('completionChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: data.course_analytics.map(course => course.course_name),
+                datasets: [{
+                    label: 'Completion Rate (%)',
+                    data: data.course_analytics.map(course => course.completion_rate),
+                    backgroundColor: 'rgba(75, 192, 192, 0.6)'
+                }]
+            },
+            options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+        });
+    
+        analyticsCharts.gradeDistributionChart = new Chart(document.getElementById('gradeDistributionChart').getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: ['A', 'B', 'C', 'D', 'F'],
+                datasets: [{
+                    data: data.grade_distribution,
+                    backgroundColor: ['rgba(75, 192, 192, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(255, 206, 86, 0.6)', 'rgba(255, 159, 64, 0.6)', 'rgba(255, 99, 132, 0.6)']
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'top' } } }
+        });
+    
+        analyticsCharts.workloadDistributionChart = new Chart(document.getElementById('workloadDistributionChart').getContext('2d'), {
+            type: 'radar',
+            data: {
+                labels: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+                datasets: [{
+                    label: 'Assignment Due Dates',
+                    data: data.workload_distribution,
+                    fill: true,
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    pointBackgroundColor: 'rgb(255, 99, 132)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgb(255, 99, 132)'
+                }]
+            },
+            options: { elements: { line: { borderWidth: 3 } } }
+        });
+    
+        // Initialize DataTable
+        $('#courseDetailsTable').DataTable({
+            pageLength: 10,
+            lengthChange: false,
+            searching: true,
+            ordering: true,
+            info: true,
+            paging: true
+        });
+
 
     function updateCourseAnalyticsTable(courseData) {
         const table = $('#courseDetailsTable').DataTable();
@@ -574,5 +643,7 @@ document.addEventListener('DOMContentLoaded', function () {
     setInterval(checkAuthStatus, 5 * 60 * 1000); // Check auth status every 5 minutes
     initializeAnalytics();
     checkAuthStatus();
+
+}
 
 });
