@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     }
-    
+
     if (analyticsContainer) {
         fetchAnalyticsData();
     }
@@ -350,20 +350,81 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    
 
-    function initializeAnalytics(data) {
-        if (!document.getElementById('submissionChart')) return;
-    
-        // Submission Timeline Chart
-        var ctx = document.getElementById('submissionChart').getContext('2d');
-        new Chart(ctx, {
+
+    let analyticsCharts = {};
+
+    function initializeAnalytics() {
+        console.log('Initializing analytics...');
+        updateAnalytics();
+    }
+
+    function updateAnalytics() {
+        console.log('Fetching analytics data...');
+        document.getElementById('loading-message').style.display = 'block';
+        document.getElementById('error-message').style.display = 'none';
+        showLoadingSpinner();
+        fetch('/get_analytics_data')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Analytics data received:', data);
+                hideLoadingSpinner();
+                document.getElementById('loading-message').style.display = 'none';
+                if (data.error) {
+                    showNotification(data.error, 'error');
+                    document.getElementById('error-message').textContent = data.error;
+                    document.getElementById('error-message').style.display = 'block';
+                } else {
+                    renderAnalytics(data);
+                }
+                // Display debug info
+                document.getElementById('debug-data').textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                console.error('Error fetching analytics data:', error);
+                hideLoadingSpinner();
+                document.getElementById('loading-message').style.display = 'none';
+                document.getElementById('error-message').textContent = 'Failed to load analytics. Please try again later.';
+                document.getElementById('error-message').style.display = 'block';
+                showNotification('Failed to load analytics. Please try again later.', 'error');
+            });
+    }
+
+    function renderAnalytics(data) {
+        console.log('Rendering analytics...');
+        updateOverviewSection(data);
+        createCharts(data);
+        updateCourseAnalyticsTable(data.course_analytics);
+    }
+
+    function updateOverviewSection(data) {
+        document.getElementById('total-courses').textContent = data.total_courses;
+        document.getElementById('total-assignments').textContent = data.total_assignments;
+        document.getElementById('overall-completion-rate').textContent = data.overall_completion_rate.toFixed(2) + '%';
+        document.getElementById('average-grade').textContent = data.average_grade.toFixed(2);
+    }
+
+    function createCharts(data) {
+        createSubmissionChart(data.submission_timeline);
+        createCompletionChart(data.course_analytics);
+        createGradeDistributionChart(data.grade_distribution);
+        createWorkloadDistributionChart(data.workload_distribution);
+    }
+
+    function createSubmissionChart(timelineData) {
+        const ctx = document.getElementById('submissionChart').getContext('2d');
+        analyticsCharts.submissionChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.submissionTimeline.dates,
+                labels: Object.keys(timelineData),
                 datasets: [{
                     label: 'Submissions',
-                    data: data.submissionTimeline.counts,
+                    data: Object.values(timelineData),
                     borderColor: 'rgb(75, 192, 192)',
                     tension: 0.1
                 }]
@@ -377,167 +438,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
-    
-        // Course Completion Rates Chart
-        var ctx2 = document.getElementById('completionChart').getContext('2d');
-        new Chart(ctx2, {
-            type: 'bar',
-            data: {
-                labels: data.courseNames,
-                datasets: [{
-                    label: 'Completion Rate (%)',
-                    data: data.completionRates,
-                    backgroundColor: 'rgba(75, 192, 192, 0.6)'
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100
-                    }
-                }
-            }
-        });
-    
-        // Grade Distribution Chart
-        var ctx3 = document.getElementById('gradeDistributionChart').getContext('2d');
-        new Chart(ctx3, {
-            type: 'pie',
-            data: {
-                labels: ['A', 'B', 'C', 'D', 'F'],
-                datasets: [{
-                    data: data.gradeDistribution,
-                    backgroundColor: [
-                        'rgba(75, 192, 192, 0.6)',
-                        'rgba(54, 162, 235, 0.6)',
-                        'rgba(255, 206, 86, 0.6)',
-                        'rgba(255, 159, 64, 0.6)',
-                        'rgba(255, 99, 132, 0.6)'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    }
-                }
-            }
-        });
-    
-        // Workload Distribution Chart
-        var ctx4 = document.getElementById('workloadDistributionChart').getContext('2d');
-        new Chart(ctx4, {
-            type: 'radar',
-            data: {
-                labels: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-                datasets: [{
-                    label: 'Assignment Due Dates',
-                    data: data.workloadDistribution,
-                    fill: true,
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    borderColor: 'rgb(255, 99, 132)',
-                    pointBackgroundColor: 'rgb(255, 99, 132)',
-                    pointBorderColor: '#fff',
-                    pointHoverBackgroundColor: '#fff',
-                    pointHoverBorderColor: 'rgb(255, 99, 132)'
-                }]
-            },
-            options: {
-                elements: {
-                    line: {
-                        borderWidth: 3
-                    }
-                }
-            }
-        });
-    
-        // Initialize DataTable for course details
-        $('#courseDetailsTable').DataTable({
-            pageLength: 10,
-            lengthChange: false,
-            searching: true,
-            ordering: true,
-            info: true,
-            paging: true
-        });
     }
 
-    function renderAnalytics(data) {
-        if (!analyticsContainer) return;
-    
-        analyticsContainer.innerHTML = `
-            <h2>Analytics Overview</h2>
-            <div class="analytics-summary">
-                <div class="summary-item">
-                    <h3>Total Courses</h3>
-                    <p>${data.total_courses}</p>
-                </div>
-                <div class="summary-item">
-                    <h3>Total Assignments</h3>
-                    <p>${data.total_assignments}</p>
-                </div>
-                <div class="summary-item">
-                    <h3>Overall Completion Rate</h3>
-                    <p>${data.overall_completion_rate.toFixed(2)}%</p>
-                </div>
-                <div class="summary-item">
-                    <h3>Average Grade</h3>
-                    <p>${data.average_grade.toFixed(2)}</p>
-                </div>
-            </div>
-            <div class="charts-container">
-                <div class="chart">
-                    <h3>Submission Timeline</h3>
-                    <canvas id="submissionChart"></canvas>
-                </div>
-                <div class="chart">
-                    <h3>Course Completion Rates</h3>
-                    <canvas id="completionChart"></canvas>
-                </div>
-                <div class="chart">
-                    <h3>Grade Distribution</h3>
-                    <canvas id="gradeDistributionChart"></canvas>
-                </div>
-                <div class="chart">
-                    <h3>Workload Distribution</h3>
-                    <canvas id="workloadDistributionChart"></canvas>
-                </div>
-            </div>
-            <div class="course-details">
-                <h3>Course Details</h3>
-                <table id="courseDetailsTable">
-                    <thead>
-                        <tr>
-                            <th>Course Name</th>
-                            <th>Total Assignments</th>
-                            <th>Completed Assignments</th>
-                            <th>Completion Rate</th>
-                            <th>Average Grade</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.analytics_data.map(course => `
-                            <tr>
-                                <td>${course.course_name}</td>
-                                <td>${course.total_assignments}</td>
-                                <td>${course.submitted_assignments}</td>
-                                <td>${course.completion_rate.toFixed(2)}%</td>
-                                <td>${course.average_grade.toFixed(2)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-    
-        initializeAnalytics(data);
+
+    function updateCourseAnalyticsTable(courseData) {
+        const table = $('#courseDetailsTable').DataTable();
+        table.clear();
+
+        courseData.forEach(course => {
+            table.row.add([
+                course.course_name,
+                course.total_assignments,
+                course.submitted_assignments,
+                course.completion_rate.toFixed(2) + '%',
+                course.average_grade.toFixed(2)
+            ]);
+        });
+
+        table.draw();
     }
+
 
     document.addEventListener('DOMContentLoaded', initializeAnalytics);
+
+
 
     function getCsrfToken() {
         const cookies = document.cookie.split(';');

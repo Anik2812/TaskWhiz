@@ -4,91 +4,88 @@
 
 {% block content %}
 {% if current_user.is_authenticated %}
-    <h1>Analytics Dashboard</h1>
+<h1>Analytics Dashboard</h1>
 
-    <div id="debug-info" style="background-color: #f0f0f0; padding: 10px; margin-bottom: 20px;">
-        <h3>Debug Information:</h3>
-        <p>Total Courses: {{ total_courses }}</p>
-        <p>Total Assignments: {{ total_assignments }}</p>
-        <p>Overall Completion Rate: {{ "%.2f"|format(overall_completion_rate) }}%</p>
-        <p>Average Grade: {{ "%.2f"|format(average_grade) }}</p>
-    </div>
-
-    <div class="analytics-container">
-        <div class="overview-section">
-            <h2>Overview</h2>
-            <div class="stat-card">
-                <h3>Total Courses</h3>
-                <p>{{ total_courses }}</p>
-            </div>
-            <div class="stat-card">
-                <h3>Total Assignments</h3>
-                <p>{{ total_assignments }}</p>
-            </div>
-            <div class="stat-card">
-                <h3>Overall Completion Rate</h3>
-                <p>{{ "%.2f"|format(overall_completion_rate) }}%</p>
-            </div>
-            <div class="stat-card">
-                <h3>Average Grade</h3>
-                <p>{{ "%.2f"|format(average_grade) }}</p>
-            </div>
+<div id="analytics-container">
+    <p id="loading-message">Loading analytics data...</p>
+    <p id="error-message" style="color: red;"></p>
+    <div class="overview-section">
+        <h2>Overview</h2>
+        <div class="stat-card">
+            <h3>Total Courses</h3>
+            <p id="total-courses">Loading...</p>
         </div>
-
-        <div class="charts-section">
-            <h2>Charts</h2>
-            <div class="chart-container">
-                <canvas id="submissionChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <canvas id="completionChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <canvas id="gradeDistributionChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <canvas id="workloadDistributionChart"></canvas>
-            </div>
+        <div class="stat-card">
+            <h3>Total Assignments</h3>
+            <p id="total-assignments">Loading...</p>
         </div>
-
-        <div class="course-analytics-section">
-            <h2>Course Analytics</h2>
-            <table id="courseDetailsTable">
-                <thead>
-                    <tr>
-                        <th>Course Name</th>
-                        <th>Total Assignments</th>
-                        <th>Submitted Assignments</th>
-                        <th>Completion Rate</th>
-                        <th>Average Grade</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for course in analytics_data %}
-                    <tr>
-                        <td>{{ course.course_name }}</td>
-                        <td>{{ course.total_assignments }}</td>
-                        <td>{{ course.submitted_assignments }}</td>
-                        <td>{{ "%.2f"|format(course.completion_rate) }}%</td>
-                        <td>{{ "%.2f"|format(course.average_grade) }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="stat-card">
+            <h3>Overall Completion Rate</h3>
+            <p id="overall-completion-rate">Loading...</p>
+        </div>
+        <div class="stat-card">
+            <h3>Average Grade</h3>
+            <p id="average-grade">Loading...</p>
         </div>
     </div>
+
+    <div class="charts-section">
+        <h2>Charts</h2>
+        <div class="chart-container">
+            <canvas id="submissionChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="completionChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="gradeDistributionChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="workloadDistributionChart"></canvas>
+        </div>
+    </div>
+
+    <div class="course-analytics-section">
+        <h2>Course Analytics</h2>
+        <table id="courseDetailsTable">
+            <thead>
+                <tr>
+                    <th>Course Name</th>
+                    <th>Total Assignments</th>
+                    <th>Submitted Assignments</th>
+                    <th>Completion Rate</th>
+                    <th>Average Grade</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- This will be populated dynamically -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="debug-info" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px;">
+    <h3>Debug Information:</h3>
+    <pre id="debug-data"></pre>
+</div>
 {% else %}
-    <p>Please log in to view analytics.</p>
+<p>Please log in to view analytics.</p>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 {% if current_user.is_authenticated %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM loaded, initializing analytics...');
-        initializeAnalytics(JSON.parse('{{ chart_data|tojson|safe }}'));
+    document.addEventListener('DOMContentLoaded', function () {
+        if (document.getElementById('analytics-container')) {
+            console.log('Analytics container found, initializing...');
+            initializeAnalytics();
+        } else {
+            console.error('Analytics container not found');
+        }
     });
 </script>
 {% endif %}
