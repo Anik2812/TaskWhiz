@@ -51,8 +51,8 @@
             </p>
             {% endif %}
             <div class="card-actions">
-                <button class="btn btn-primary view-details" data-assignment-id="{{ assignment.id }}">
-                    <i class="fas fa-eye"></i> View Details
+                <button class="btn btn-primary toggle-details" data-assignment-id="{{ assignment.id }}">
+                    <i class="fas fa-chevron-down"></i> View Details
                 </button>
                 {% if assignment.status == 'Not Submitted' %}
                 <div class="file-upload">
@@ -68,6 +68,13 @@
                 <button class="btn btn-secondary open-assignment" data-assignment-id="{{ assignment.id }}">
                     <i class="fas fa-folder-open"></i> Open
                 </button>
+
+                <div class="assignment-details" style="display: none;">
+                    <p><strong>Description:</strong> {{ assignment.description | default('No description available', true) }}</p>
+                    <p><strong>Created:</strong> {{ assignment.created_date | default('N/A', true) }}</p>
+                    <p><strong>Last Modified:</strong> {{ assignment.last_modified | default('N/A', true) }}</p>
+                    <p><strong>Grade:</strong> {{ assignment.grade | default('Not graded', true) }} / {{ assignment.total_marks | default('N/A', true) }}</p>
+                </div>
                 {% endif %}
             </div>
         </div>

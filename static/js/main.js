@@ -15,6 +15,42 @@ document.addEventListener('DOMContentLoaded', function () {
     const deleteAccountBtn = document.getElementById('delete-account');
     const deleteAccountModal = document.getElementById('delete-account-modal');
     const analyticsContainer = document.getElementById('analytics-container');
+    const assignmentsContainer = document.querySelector('.assignments-container');
+
+    if (assignmentsContainer) {
+        assignmentsContainer.addEventListener('click', function (event) {
+            const toggleButton = event.target.closest('.toggle-details');
+            if (toggleButton) {
+                const card = toggleButton.closest('.assignment-card');
+                let details = card.querySelector('.assignment-details');
+
+                // If details element doesn't exist, create it
+                if (!details) {
+                    details = document.createElement('div');
+                    details.className = 'assignment-details';
+                    details.style.display = 'none';
+                    details.innerHTML = `
+                    <p><strong>Description:</strong> No description available</p>
+                    <p><strong>Created:</strong> N/A</p>
+                    <p><strong>Last Modified:</strong> N/A</p>
+                    <p><strong>Grade:</strong> Not graded / N/A</p>
+                `;
+                    card.appendChild(details);
+                    console.log('Created missing details element for card:', card);
+                }
+
+                // Toggle visibility
+                const isHidden = details.style.display === 'none';
+                details.style.display = isHidden ? 'block' : 'none';
+
+                // Update icon
+                const icon = toggleButton.querySelector('i');
+                icon.classList.toggle('fa-chevron-down', !isHidden);
+                icon.classList.toggle('fa-chevron-up', isHidden);
+            }
+        });
+    }
+
 
     // Theme toggle functionality
     function setupThemeToggle() {
@@ -133,15 +169,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
     }
-
-    // View Details functionality
-    assignmentsGrid.addEventListener('click', function(e) {
-        if (e.target.classList.contains('view-details') || e.target.closest('.view-details')) {
-            const button = e.target.classList.contains('view-details') ? e.target : e.target.closest('.view-details');
-            const assignmentId = button.getAttribute('data-assignment-id');
-            fetchAssignmentDetails(assignmentId);
-        }
-    });
 
     // Fetch assignment details
     function fetchAssignmentDetails(assignmentId) {
@@ -526,7 +553,7 @@ document.addEventListener('DOMContentLoaded', function () {
             'D+ (67-69%)', 'D (63-66%)', 'D- (60-62%)',
             'F (Below 60%)'
         ];
-    
+
         new Chart(ctx, {
             type: 'pie',
             data: {
@@ -557,7 +584,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 let label = context.label || '';
                                 if (label) {
                                     label += ': ';
