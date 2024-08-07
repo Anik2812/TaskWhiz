@@ -401,8 +401,32 @@ document.addEventListener('DOMContentLoaded', function () {
     let analyticsCharts = {};
 
     function initializeAnalytics() {
-        console.log("Initializing analytics...");
-        fetchAnalyticsData();
+        console.log('Initializing analytics...');
+        
+        document.getElementById('loading-spinner').style.display = 'flex';
+        document.getElementById('error-message').style.display = 'none';
+    
+        fetch('/get_analytics_data')  // Changed from '/api/analytics'
+            .then(response => {
+                console.log('Received response from server');
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Parsed JSON data:', data);
+                updateAnalytics(data);
+            })
+            .catch(error => {
+                console.error('Error fetching analytics:', error);
+                document.getElementById('error-message').textContent = 'Error loading analytics data. Please try again later.';
+                document.getElementById('error-message').style.display = 'block';
+            })
+            .finally(() => {
+                document.getElementById('loading-spinner').style.display = 'none';
+            });
+            fetchAnalyticsData();
     }
 
     function fetchAnalyticsData() {
