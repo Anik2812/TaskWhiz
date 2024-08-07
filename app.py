@@ -664,17 +664,10 @@ def create_course():
 
 @app.route('/get_analytics_data')
 @login_required
-def get_analytics_data():
-    try:
-        analytics_data = fetch_analytics_data()
-        return jsonify(analytics_data)
-    except Exception as e:
-        logger.error(f"Error fetching analytics data: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
 def fetch_analytics_data():
     credentials = get_credentials()
     if not credentials:
+        logger.error("No valid credentials found")
         raise Exception("No valid credentials found")
 
     classroom_service = build('classroom', 'v1', credentials=credentials)
@@ -687,7 +680,7 @@ def fetch_analytics_data():
 
         all_assignments = []
         submission_timeline = {}
-        grade_distribution = [0, 0, 0, 0, 0]  # A, B, C, D, F
+        grade_distribution = [0] * 13  # A+, A, A-, B+, B, B-, C+, C, C-, D+, D, D-, F
         workload_distribution = [0] * 7  # Mon to Sun
 
         for course in courses:
@@ -720,29 +713,32 @@ def fetch_analytics_data():
 
                             if 'assignedGrade' in submission:
                                 grade = int(submission['assignedGrade'])
-                                if grade >= 97:
+                                max_points = int(work.get('maxPoints', 100))
+                                grade_percentage = (grade / max_points) * 100
+
+                                if grade_percentage >= 97:
                                     grade_distribution[0] += 1  # A+
-                                elif grade >= 93:
+                                elif grade_percentage >= 93:
                                     grade_distribution[1] += 1  # A
-                                elif grade >= 90:
+                                elif grade_percentage >= 90:
                                     grade_distribution[2] += 1  # A-
-                                elif grade >= 87:
+                                elif grade_percentage >= 87:
                                     grade_distribution[3] += 1  # B+
-                                elif grade >= 83:
+                                elif grade_percentage >= 83:
                                     grade_distribution[4] += 1  # B
-                                elif grade >= 80:
+                                elif grade_percentage >= 80:
                                     grade_distribution[5] += 1  # B-
-                                elif grade >= 77:
+                                elif grade_percentage >= 77:
                                     grade_distribution[6] += 1  # C+
-                                elif grade >= 73:
+                                elif grade_percentage >= 73:
                                     grade_distribution[7] += 1  # C
-                                elif grade >= 70:
+                                elif grade_percentage >= 70:
                                     grade_distribution[8] += 1  # C-
-                                elif grade >= 67:
+                                elif grade_percentage >= 67:
                                     grade_distribution[9] += 1  # D+
-                                elif grade >= 63:
+                                elif grade_percentage >= 63:
                                     grade_distribution[10] += 1  # D
-                                elif grade >= 60:
+                                elif grade_percentage >= 60:
                                     grade_distribution[11] += 1  # D-
                                 else:
                                     grade_distribution[12] += 1  # F
@@ -758,9 +754,15 @@ def fetch_analytics_data():
                     except HttpError as e:
                         logger.error(f"Error fetching submissions for assignment {work['id']}: {str(e)}")
                         continue
+                    except Exception as e:
+                        logger.error(f"Unexpected error processing assignment {work['id']}: {str(e)}")
+                        continue
 
             except HttpError as e:
                 logger.error(f"Error fetching assignments for course {course['name']}: {str(e)}")
+                continue
+            except Exception as e:
+                logger.error(f"Unexpected error processing course {course['name']}: {str(e)}")
                 continue
 
         total_assignments = len(all_assignments)
@@ -768,7 +770,7 @@ def fetch_analytics_data():
         overall_completion_rate = (completed_assignments / total_assignments * 100) if total_assignments > 0 else 0
         
         graded_assignments = [a for a in all_assignments if a['grade'] != 'Not graded']
-        average_grade = sum(int(a['grade']) for a in graded_assignments) / len(graded_assignments) if graded_assignments else 0
+        average_grade = sum(float(a['grade']) for a in graded_assignments) / len(graded_assignments) if graded_assignments else 0
 
         course_analytics = []
         for course in courses:
@@ -778,7 +780,7 @@ def fetch_analytics_data():
             completion_rate = (completed_course_assignments / total_course_assignments * 100) if total_course_assignments > 0 else 0
             
             graded_course_assignments = [a for a in course_assignments if a['grade'] != 'Not graded']
-            average_course_grade = sum(int(a['grade']) for a in graded_course_assignments) / len(graded_course_assignments) if graded_course_assignments else 0
+            average_course_grade = sum(float(a['grade']) for a in graded_course_assignments) / len(graded_course_assignments) if graded_course_assignments else 0
             
             course_analytics.append({
                 'course_name': course['name'],
