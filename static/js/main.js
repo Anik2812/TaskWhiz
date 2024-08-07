@@ -55,6 +55,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Notification function
     function showNotification(message, type) {
+        const notificationContainer = document.getElementById('notification-container');
         if (!notificationContainer) {
             console.error('Notification container not found');
             return;
@@ -399,7 +400,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let analyticsCharts = {};
 
     function initializeAnalytics() {
-        console.log('Initializing analytics...');
+        console.log("Initializing analytics...");
         fetchAnalyticsData();
     }
 
@@ -579,6 +580,183 @@ document.addEventListener('DOMContentLoaded', function () {
         table.draw();
     }
 
+    function setupAnalyticsPage() {
+        console.log('Setting up analytics page...');
+        
+        // Show loading spinner
+        document.getElementById('loading-spinner').style.display = 'block';
+        
+        // Hide error message initially
+        document.getElementById('error-message').style.display = 'none';
+        
+        // Fetch analytics data
+        fetch('/get_analytics_data')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Analytics data received:', data);
+                
+                // Hide loading spinner
+                document.getElementById('loading-spinner').style.display = 'none';
+                
+                // Update overview section
+                document.getElementById('total-courses').textContent = data.total_courses;
+                document.getElementById('total-assignments').textContent = data.total_assignments;
+                document.getElementById('overall-completion-rate').textContent = `${data.overall_completion_rate.toFixed(2)}%`;
+                document.getElementById('average-grade').textContent = data.average_grade.toFixed(2);
+                
+                // Create charts
+                createSubmissionChart(data.submission_timeline);
+                createCompletionChart(data.course_analytics);
+                createGradeDistributionChart(data.grade_distribution);
+                createWorkloadDistributionChart(data.workload_distribution);
+                
+                // Update course analytics table
+                updateCourseAnalyticsTable(data.course_analytics);
+            })
+            .catch(error => {
+                console.error('Error fetching analytics data:', error);
+                document.getElementById('loading-spinner').style.display = 'none';
+                document.getElementById('error-message').textContent = 'Failed to load analytics. Please try again later.';
+                document.getElementById('error-message').style.display = 'block';
+            });
+    }
+    
+    function createSubmissionChart(timelineData) {
+        const ctx = document.getElementById('submissionChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Object.keys(timelineData),
+                datasets: [{
+                    label: 'Submissions',
+                    data: Object.values(timelineData),
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    function createCompletionChart(courseData) {
+        const ctx = document.getElementById('completionChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: courseData.map(course => course.course_name),
+                datasets: [{
+                    label: 'Completion Rate (%)',
+                    data: courseData.map(course => course.completion_rate),
+                    backgroundColor: 'rgba(75, 192, 192, 0.6)'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+    }
+    
+    function createGradeDistributionChart(gradeData) {
+        const ctx = document.getElementById('gradeDistributionChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['A', 'B', 'C', 'D', 'F'],
+                datasets: [{
+                    data: gradeData,
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 206, 86, 0.6)',
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(255, 99, 132, 0.6)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                }
+            }
+        });
+    }
+    
+    function createWorkloadDistributionChart(workloadData) {
+        const ctx = document.getElementById('workloadDistributionChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+                datasets: [{
+                    label: 'Assignment Due Dates',
+                    data: workloadData,
+                    fill: true,
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    pointBackgroundColor: 'rgb(255, 99, 132)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgb(255, 99, 132)'
+                }]
+            },
+            options: {
+                elements: {
+                    line: {
+                        borderWidth: 3
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateCourseAnalyticsTable(courseData) {
+        const tableBody = document.querySelector('#courseDetailsTable tbody');
+        tableBody.innerHTML = ''; // Clear existing rows
+        
+        courseData.forEach(course => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${course.course_name}</td>
+                <td>${course.total_assignments}</td>
+                <td>${course.submitted_assignments}</td>
+                <td>${course.completion_rate.toFixed(2)}%</td>
+                <td>${course.average_grade.toFixed(2)}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+        
+        // If you're using DataTables, reinitialize it here
+        if ($.fn.DataTable.isDataTable('#courseDetailsTable')) {
+            $('#courseDetailsTable').DataTable().destroy();
+        }
+        $('#courseDetailsTable').DataTable({
+            responsive: true,
+            order: [[3, 'desc']] // Sort by completion rate descending
+        });
+    }
+    
+
     // Initialize components
     setupThemeToggle();
     applyTheme();
@@ -586,10 +764,18 @@ document.addEventListener('DOMContentLoaded', function () {
         courseFilter.addEventListener('change', applyFiltersAndSort);
         statusFilter.addEventListener('change', applyFiltersAndSort);
         sortFilter.addEventListener('change', applyFiltersAndSort);
-        applyFiltersAndSort();
+    }
+    if (document.getElementById('analyticsContainer')) {
+        setupAnalyticsPage();
     }
     setupCourseDetailsToggle();
     setInterval(checkAuthStatus, 5 * 60 * 1000); // Check auth status every 5 minutes
     initializeAnalytics();
     checkAuthStatus();
+    setupAssignmentCards();
+    setupSettingsPage();
+    applyFiltersAndSort();
+    populateTimeZones();
+
+
 });
