@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const courseFilter = document.getElementById('course-filter');
     const statusFilter = document.getElementById('status-filter');
     const sortFilter = document.getElementById('sort-filter');
-    const assignmentsGrid = document.getElementById('assignments-grid');
+    const assignmentsGrid = document.getElementById('assignments');
     const timeZoneSelect = document.getElementById('time_zone');
     const showGithubTokenBtn = document.getElementById('show-github-token');
     const deleteAccountBtn = document.getElementById('delete-account');
@@ -251,12 +251,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Filter and sort assignments
     function applyFiltersAndSort() {
+        const assignmentsGrid = document.getElementById('assignments');
         if (!assignmentsGrid) return;
 
         const assignments = Array.from(assignmentsGrid.children);
-        const courseValue = courseFilter.value.toLowerCase();
-        const statusValue = statusFilter.value.toLowerCase();
-        const sortValue = sortFilter.value;
+        const courseValue = document.getElementById('course-filter').value.toLowerCase();
+        const statusValue = document.getElementById('status-filter').value.toLowerCase();
+        const sortValue = document.getElementById('sort-filter').value;
 
         assignments.forEach(assignment => {
             const course = assignment.querySelector('.assignment-course').textContent.toLowerCase();
@@ -279,9 +280,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     return new Date(b.querySelector('.assignment-due-date').textContent.split('Due: ')[1]) -
                         new Date(a.querySelector('.assignment-due-date').textContent.split('Due: ')[1]);
                 case 'title_asc':
-                    return a.querySelector('h2').textContent.localeCompare(b.querySelector('h2').textContent);
+                    return a.querySelector('.assignment-title').textContent.localeCompare(b.querySelector('.assignment-title').textContent);
                 case 'title_desc':
-                    return b.querySelector('h2').textContent.localeCompare(a.querySelector('h2').textContent);
+                    return b.querySelector('.assignment-title').textContent.localeCompare(a.querySelector('.assignment-title').textContent);
                 default:
                     return 0;
             }
@@ -582,13 +583,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function setupAnalyticsPage() {
         console.log('Setting up analytics page...');
-        
+
         // Show loading spinner
         document.getElementById('loading-spinner').style.display = 'block';
-        
+
         // Hide error message initially
         document.getElementById('error-message').style.display = 'none';
-        
+
         // Fetch analytics data
         fetch('/get_analytics_data')
             .then(response => {
@@ -599,22 +600,22 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .then(data => {
                 console.log('Analytics data received:', data);
-                
+
                 // Hide loading spinner
                 document.getElementById('loading-spinner').style.display = 'none';
-                
+
                 // Update overview section
                 document.getElementById('total-courses').textContent = data.total_courses;
                 document.getElementById('total-assignments').textContent = data.total_assignments;
                 document.getElementById('overall-completion-rate').textContent = `${data.overall_completion_rate.toFixed(2)}%`;
                 document.getElementById('average-grade').textContent = data.average_grade.toFixed(2);
-                
+
                 // Create charts
                 createSubmissionChart(data.submission_timeline);
                 createCompletionChart(data.course_analytics);
                 createGradeDistributionChart(data.grade_distribution);
                 createWorkloadDistributionChart(data.workload_distribution);
-                
+
                 // Update course analytics table
                 updateCourseAnalyticsTable(data.course_analytics);
             })
@@ -625,7 +626,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('error-message').style.display = 'block';
             });
     }
-    
+
     function createSubmissionChart(timelineData) {
         const ctx = document.getElementById('submissionChart').getContext('2d');
         new Chart(ctx, {
@@ -649,7 +650,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-    
+
     function createCompletionChart(courseData) {
         const ctx = document.getElementById('completionChart').getContext('2d');
         new Chart(ctx, {
@@ -673,7 +674,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-    
+
     function createGradeDistributionChart(gradeData) {
         const ctx = document.getElementById('gradeDistributionChart').getContext('2d');
         new Chart(ctx, {
@@ -701,7 +702,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-    
+
     function createWorkloadDistributionChart(workloadData) {
         const ctx = document.getElementById('workloadDistributionChart').getContext('2d');
         new Chart(ctx, {
@@ -729,11 +730,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-    
+
     function updateCourseAnalyticsTable(courseData) {
         const tableBody = document.querySelector('#courseDetailsTable tbody');
         tableBody.innerHTML = ''; // Clear existing rows
-        
+
         courseData.forEach(course => {
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -745,7 +746,7 @@ document.addEventListener('DOMContentLoaded', function () {
             `;
             tableBody.appendChild(row);
         });
-        
+
         // If you're using DataTables, reinitialize it here
         if ($.fn.DataTable.isDataTable('#courseDetailsTable')) {
             $('#courseDetailsTable').DataTable().destroy();
@@ -755,7 +756,14 @@ document.addEventListener('DOMContentLoaded', function () {
             order: [[3, 'desc']] // Sort by completion rate descending
         });
     }
-    
+
+    // View Details functionality
+    document.querySelectorAll('.view-details').forEach(button => {
+        button.addEventListener('click', function () {
+            const assignmentId = this.getAttribute('data-assignment-id');
+            fetchAssignmentDetails(assignmentId);
+        });
+    });
 
     // Initialize components
     setupThemeToggle();
@@ -768,6 +776,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (document.getElementById('analyticsContainer')) {
         setupAnalyticsPage();
     }
+    document.getElementById('course-filter').addEventListener('change', applyFiltersAndSort);
+    document.getElementById('status-filter').addEventListener('change', applyFiltersAndSort);
+    document.getElementById('sort-filter').addEventListener('change', applyFiltersAndSort);
     setupCourseDetailsToggle();
     setInterval(checkAuthStatus, 5 * 60 * 1000); // Check auth status every 5 minutes
     initializeAnalytics();

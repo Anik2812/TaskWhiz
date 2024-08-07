@@ -138,9 +138,9 @@
                     <i class="fas fa-folder-open"></i> Open
                 </button>
                 {% endif %}
-                <button class="btn btn-secondary toggle-details">
+                <button class="btn btn-secondary toggle-details" aria-label="Toggle assignment details">
                     <i class="fas fa-chevron-down"></i> Details
-                </button>
+                  </button>
             </div>
             <div class="assignment-details" style="display: none;">
                 <p><strong>Description:</strong> {{ assignment.description | default('No description available', true) }}</p>
