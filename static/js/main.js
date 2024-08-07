@@ -134,6 +134,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // View Details functionality
+    assignmentsGrid.addEventListener('click', function(e) {
+        if (e.target.classList.contains('view-details') || e.target.closest('.view-details')) {
+            const button = e.target.classList.contains('view-details') ? e.target : e.target.closest('.view-details');
+            const assignmentId = button.getAttribute('data-assignment-id');
+            fetchAssignmentDetails(assignmentId);
+        }
+    });
+
     // Fetch assignment details
     function fetchAssignmentDetails(assignmentId) {
         showLoadingSpinner();

@@ -571,6 +571,82 @@ def assignments():
         logger.error(f"Error in assignments route: {str(e)}", exc_info=True)
         flash("Failed to load assignments. Please try again later.", "error")
         return redirect(url_for('dashboard'))
+    
+
+
+@app.route('/assignment/<assignment_id>')
+@login_required
+def get_assignment_details(assignment_id):
+    credentials = get_credentials()
+    classroom_service = build('classroom', 'v1', credentials=credentials)
+    
+    try:
+        # Fetch all courses to locate the correct course for the assignment
+        courses = classroom_service.courses().list(pageSize=10).execute().get('courses', [])
+        for course in courses:
+            try:
+                # Fetch the assignment details from the course
+                assignment = classroom_service.courses().courseWork().get(
+                    courseId=course['id'],
+                    id=assignment_id
+                ).execute()
+                
+                # Fetch submission details
+                submissions = classroom_service.courses().courseWork().studentSubmissions().list(
+                    courseId=course['id'],
+                    courseWorkId=assignment_id,
+                    userId='me'
+                ).execute().get('studentSubmissions', [])
+                
+                submission = submissions[0] if submissions else None
+                
+                assignment_details = {
+                    'id': assignment['id'],
+                    'title': assignment['title'],
+                    'description': assignment.get('description', 'No description available'),
+                    'course': course['name'],
+                    'due_date': format_due_date(assignment.get('dueDate')),
+                    'status': get_submission_status(submission),
+                    'grade': submission.get('assignedGrade') if submission else None,
+                    'total_marks': assignment.get('maxPoints'),
+                    'feedback': submission.get('feedback', {}).get('text') if submission else None,
+                    'file_url': get_attachment_url(submission) if submission else None
+                }
+                
+                logger.info(f"Fetched details for assignment ID: {assignment_id}")
+                return jsonify({'success': True, 'assignment': assignment_details})
+            except HttpError as e:
+                logger.warning(f"Assignment ID {assignment_id} not found in course ID {course['id']}: {e}")
+                continue  # Assignment not found in this course, try the next one
+        
+        return jsonify({'success': False, 'message': 'Assignment not found'})
+    except Exception as e:
+        logger.error(f"Error fetching assignment details: {str(e)}")
+        return jsonify({'success': False, 'message': 'Error fetching assignment details'})
+
+def format_due_date(due_date):
+    if not due_date:
+        return 'No due date'
+    return f"{due_date['year']}-{due_date['month']}-{due_date['day']}"
+
+def get_submission_status(submission):
+    if not submission:
+        return 'Not Submitted'
+    state = submission['state']
+    if state == 'TURNED_IN':
+        return 'Submitted'
+    elif state == 'RETURNED':
+        return 'Graded'
+    return 'Not Submitted'
+
+def get_attachment_url(submission):
+    if 'attachments' in submission:
+        for attachment in submission['attachments']:
+            if 'driveFile' in attachment:
+                return attachment['driveFile'].get('alternateLink')
+    return None
+
+
 
 @app.route('/courses')
 @login_required
