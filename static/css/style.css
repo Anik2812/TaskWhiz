@@ -1760,3 +1760,97 @@ body.dark-theme .chart-container canvas {
       -webkit-overflow-scrolling: touch;
   }
 }
+
+
+.assignment-details {
+  display: none;
+  transition: all 0.3s ease-in-out;
+  padding: 15px;
+  border-top: 1px solid #ddd;
+  background-color: #f9f9f9;
+}
+
+.assignment-details.hidden {
+  display: block;
+}
+
+.assignment-card {
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.assignment-card .assignment-header {
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+}
+
+.assignment-card .assignment-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.assignment-card .card-actions {
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #fafafa;
+}
+
+.assignment-card .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.assignment-card .btn-primary {
+  background-color: #007bff;
+  color: #fff;
+}
+
+.assignment-card .btn-secondary {
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.assignment-card .btn i {
+  margin-right: 5px;
+}
+
+.assignment-card .file-upload {
+  display: inline-flex;
+  align-items: center;
+}
+
+.assignment-card .file-upload input {
+  display: none;
+}
+
+.assignment-card .file-upload label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  background-color: #6c757d;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.assignment-card .assignment-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 3px;
+  font-size: 14px;
+  font-weight: bold;
+}

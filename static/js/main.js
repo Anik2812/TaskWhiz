@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const assignmentsContainer = document.querySelector('.assignments-container');
 
     if (assignmentsContainer) {
-        assignmentsContainer.addEventListener('click', function (event) {
+        assignmentsContainer.addEventListener('click', function(event) {
             const toggleButton = event.target.closest('.toggle-details');
             if (toggleButton) {
                 const card = toggleButton.closest('.assignment-card');
@@ -28,25 +28,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!details) {
                     details = document.createElement('div');
                     details.className = 'assignment-details';
-                    details.style.display = 'none';
                     details.innerHTML = `
-                    <p><strong>Description:</strong> No description available</p>
-                    <p><strong>Created:</strong> N/A</p>
-                    <p><strong>Last Modified:</strong> N/A</p>
-                    <p><strong>Grade:</strong> Not graded / N/A</p>
-                `;
+                        <p><strong>Description:</strong> No description available</p>
+                        <p><strong>Created:</strong> N/A</p>
+                        <p><strong>Last Modified:</strong> N/A</p>
+                        <p><strong>Grade:</strong> Not graded / N/A</p>
+                    `;
                     card.appendChild(details);
                     console.log('Created missing details element for card:', card);
                 }
 
-                // Toggle visibility
-                const isHidden = details.style.display === 'none';
-                details.style.display = isHidden ? 'block' : 'none';
-
+                // Toggle visibility with smooth transition
+                details.classList.toggle('hidden');
+                
                 // Update icon
                 const icon = toggleButton.querySelector('i');
-                icon.classList.toggle('fa-chevron-down', !isHidden);
-                icon.classList.toggle('fa-chevron-up', isHidden);
+                icon.classList.toggle('fa-chevron-down');
+                icon.classList.toggle('fa-chevron-up');
             }
         });
     }
