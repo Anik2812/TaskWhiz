@@ -717,19 +717,35 @@ def fetch_analytics_data():
                             
                             if due_date:
                                 workload_distribution[due_date.weekday()] += 1
-                            
+
                             if 'assignedGrade' in submission:
                                 grade = int(submission['assignedGrade'])
-                                if grade >= 90:
-                                    grade_distribution[0] += 1
+                                if grade >= 97:
+                                    grade_distribution[0] += 1  # A+
+                                elif grade >= 93:
+                                    grade_distribution[1] += 1  # A
+                                elif grade >= 90:
+                                    grade_distribution[2] += 1  # A-
+                                elif grade >= 87:
+                                    grade_distribution[3] += 1  # B+
+                                elif grade >= 83:
+                                    grade_distribution[4] += 1  # B
                                 elif grade >= 80:
-                                    grade_distribution[1] += 1
+                                    grade_distribution[5] += 1  # B-
+                                elif grade >= 77:
+                                    grade_distribution[6] += 1  # C+
+                                elif grade >= 73:
+                                    grade_distribution[7] += 1  # C
                                 elif grade >= 70:
-                                    grade_distribution[2] += 1
+                                    grade_distribution[8] += 1  # C-
+                                elif grade >= 67:
+                                    grade_distribution[9] += 1  # D+
+                                elif grade >= 63:
+                                    grade_distribution[10] += 1  # D
                                 elif grade >= 60:
-                                    grade_distribution[3] += 1
+                                    grade_distribution[11] += 1  # D-
                                 else:
-                                    grade_distribution[4] += 1
+                                    grade_distribution[12] += 1  # F
                         
                         all_assignments.append({
                             'id': work['id'],

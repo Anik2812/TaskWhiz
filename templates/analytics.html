@@ -3,7 +3,7 @@
 {% block title %}Analytics Dashboard{% endblock %}
 
 {% block content %}
-<div class="analytics-container">
+<div class="analytics-container" id="analyticsContainer">
     <h1 class="page-title"><i class="fas fa-chart-line"></i> Analytics Dashboard</h1>
 
     {% if current_user.is_authenticated %}
@@ -38,11 +38,11 @@
 
         <div class="analytics-charts">
             <div class="chart-container">
-                <h2>Submission Status</h2>
+                <h2>Submission Timeline</h2>
                 <canvas id="submissionChart"></canvas>
             </div>
             <div class="chart-container">
-                <h2>Completion Rate</h2>
+                <h2>Completion Rate by Course</h2>
                 <canvas id="completionChart"></canvas>
             </div>
             <div class="chart-container">
@@ -89,112 +89,13 @@
 <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    if (document.querySelector('.analytics-container')) {
+    if (document.querySelector('#analyticsContainer')) {
         console.log('Analytics container found, initializing...');
-        initializeAnalytics();
+        setupAnalyticsPage();
     } else {
         console.error('Analytics container not found');
     }
 });
-
-function initializeAnalytics() {
-    fetch('/get_analytics_data')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('loading-spinner').style.display = 'none';
-            updateDashboardSummary(data);
-            createCharts(data);
-            populateCourseTable(data);
-        })
-        .catch(error => {
-            document.getElementById('loading-spinner').style.display = 'none';
-            document.getElementById('error-message').textContent = 'Error loading analytics data. Please try again later.';
-            document.getElementById('error-message').style.display = 'block';
-            console.error('Error:', error);
-        });
-}
-
-function updateDashboardSummary(data) {
-    document.getElementById('total-courses').textContent = data.total_courses;
-    document.getElementById('total-assignments').textContent = data.total_assignments;
-    document.getElementById('overall-completion-rate').textContent = data.overall_completion_rate + '%';
-    document.getElementById('average-grade').textContent = data.average_grade.toFixed(2);
-}
-
-function createCharts(data) {
-    createPieChart('submissionChart', data.submission_status, 'Submission Status');
-    createBarChart('completionChart', data.completion_rate, 'Completion Rate by Course');
-    createBarChart('gradeDistributionChart', data.grade_distribution, 'Grade Distribution');
-    createBarChart('workloadDistributionChart', data.workload_distribution, 'Workload Distribution');
-}
-
-function createPieChart(canvasId, data, title) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: Object.keys(data),
-            datasets: [{
-                data: Object.values(data),
-                backgroundColor: ['#4a90e2', '#f5a623', '#7ed321', '#50e3c2', '#b8e986'],
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            title: {
-                display: true,
-                text: title
-            }
-        }
-    });
-}
-
-function createBarChart(canvasId, data, title) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: Object.keys(data),
-            datasets: [{
-                label: title,
-                data: Object.values(data),
-                backgroundColor: '#4a90e2',
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            },
-            title: {
-                display: true,
-                text: title
-            }
-        }
-    });
-}
-
-function populateCourseTable(data) {
-    const table = $('#courseDetailsTable').DataTable({
-        data: data.course_details,
-        columns: [
-            { data: 'course_name' },
-            { data: 'total_assignments' },
-            { data: 'submitted_assignments' },
-            { data: 'completion_rate', render: function(data) { return data + '%'; } },
-            { data: 'average_grade', render: function(data) { return data.toFixed(2); } }
-        ],
-        responsive: true,
-        pageLength: 10,
-        lengthChange: false,
-        searching: true,
-        info: false
-    });
-}
 </script>
 {% endif %}
 {% endblock %}

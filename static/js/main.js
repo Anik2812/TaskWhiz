@@ -510,26 +510,55 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function createGradeDistributionChart(gradeData) {
         const ctx = document.getElementById('gradeDistributionChart').getContext('2d');
-        analyticsCharts.gradeDistributionChart = new Chart(ctx, {
+        const gradeRanges = [
+            'A+ (97-100%)', 'A (93-96%)', 'A- (90-92%)',
+            'B+ (87-89%)', 'B (83-86%)', 'B- (80-82%)',
+            'C+ (77-79%)', 'C (73-76%)', 'C- (70-72%)',
+            'D+ (67-69%)', 'D (63-66%)', 'D- (60-62%)',
+            'F (Below 60%)'
+        ];
+    
+        new Chart(ctx, {
             type: 'pie',
             data: {
-                labels: ['A', 'B', 'C', 'D', 'F'],
+                labels: gradeRanges,
                 datasets: [{
                     data: gradeData,
                     backgroundColor: [
-                        'rgba(75, 192, 192, 0.6)',
-                        'rgba(54, 162, 235, 0.6)',
-                        'rgba(255, 206, 86, 0.6)',
-                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(75, 192, 192, 0.8)', 'rgba(75, 192, 192, 0.6)', 'rgba(75, 192, 192, 0.4)',
+                        'rgba(54, 162, 235, 0.8)', 'rgba(54, 162, 235, 0.6)', 'rgba(54, 162, 235, 0.4)',
+                        'rgba(255, 206, 86, 0.8)', 'rgba(255, 206, 86, 0.6)', 'rgba(255, 206, 86, 0.4)',
+                        'rgba(255, 159, 64, 0.8)', 'rgba(255, 159, 64, 0.6)', 'rgba(255, 159, 64, 0.4)',
                         'rgba(255, 99, 132, 0.6)'
-                    ]
+                    ],
+                    borderColor: 'rgba(255, 255, 255, 0.5)',
+                    borderWidth: 1
                 }]
             },
             options: {
                 responsive: true,
                 plugins: {
                     legend: {
-                        position: 'top',
+                        position: 'right',
+                        labels: {
+                            font: {
+                                size: 10
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed !== null) {
+                                    label += context.parsed + ' students';
+                                }
+                                return label;
+                            }
+                        }
                     }
                 }
             }
