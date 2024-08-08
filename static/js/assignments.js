@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const searchInput = document.getElementById('search-input');
     const courseFilter = document.getElementById('course-filter');
     const statusFilter = document.getElementById('status-filter');
@@ -57,22 +57,20 @@ document.addEventListener('DOMContentLoaded', function() {
     sortFilter.addEventListener('change', filterAndSortAssignments);
 
     // View Details functionality
-    assignmentsGrid.addEventListener('click', function(e) {
+    assignmentsGrid.addEventListener('click', function (e) {
         if (e.target.classList.contains('view-details')) {
             const assignmentId = e.target.getAttribute('data-assignment-id');
             fetchAssignmentDetails(assignmentId);
         }
     });
 
+    // Fetch assignment details
     function fetchAssignmentDetails(assignmentId) {
+        showLoadingSpinner();
         fetch(`/assignment/${assignmentId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
+                hideLoadingSpinner();
                 if (data.success) {
                     displayAssignmentDetails(data.assignment);
                 } else {
@@ -80,60 +78,56 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
+                hideLoadingSpinner();
                 console.error('Error:', error);
                 showNotification('An error occurred while fetching assignment details.', 'error');
             });
     }
 
+    // Display assignment details
     function displayAssignmentDetails(assignment) {
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>${assignment.title}</h2>
-                <p><strong>Course:</strong> ${assignment.course}</p>
-                <p><strong>Due Date:</strong> ${assignment.due_date}</p>
-                <p><strong>Status:</strong> ${assignment.status}</p>
-                <p><strong>Description:</strong> ${assignment.description}</p>
-                ${assignment.grade ? `<p><strong>Grade:</strong> ${assignment.grade} / ${assignment.total_marks}</p>` : ''}
-            </div>
-        `;
-        document.body.appendChild(modal);
-
-        const closeBtn = modal.querySelector('.close');
-        closeBtn.onclick = function() {
-            modal.remove();
+        let modal = document.getElementById('assignment-details-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'assignment-details-modal';
+            modal.className = 'modal';
+            document.body.appendChild(modal);
         }
 
-        window.onclick = function(event) {
+        const detailsHtml = `
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>${assignment.title}</h2>
+            <p><strong>Course:</strong> ${assignment.course}</p>
+            <p><strong>Due Date:</strong> ${formatDate(assignment.due_date)}</p>
+            <p><strong>Status:</strong> ${assignment.status}</p>
+            <p><strong>Description:</strong> ${assignment.description || 'No description available'}</p>
+            ${assignment.file_url ? `<p><strong>Attached File:</strong> <a href="${assignment.file_url}" target="_blank">View File</a></p>` : ''}
+            ${assignment.status === 'Graded' ? `<p><strong>Grade:</strong> ${assignment.grade} / ${assignment.total_marks}</p>` : ''}
+            ${assignment.feedback ? `<p><strong>Feedback:</strong> ${assignment.feedback}</p>` : ''}
+        </div>
+    `;
+
+        modal.innerHTML = detailsHtml;
+        modal.style.display = 'block';
+
+        const closeSpan = modal.querySelector('.close');
+        closeSpan.onclick = function () {
+            modal.style.display = 'none';
+        }
+
+        window.onclick = function (event) {
             if (event.target == modal) {
-                modal.remove();
+                modal.style.display = 'none';
             }
         }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && modal.style.display === 'block') {
+                modal.style.display = 'none';
+            }
+        });
     }
-
-    // File upload functionality
-    assignmentsGrid.addEventListener('change', function(e) {
-        if (e.target.classList.contains('file-input')) {
-            const fileName = e.target.files[0].name;
-            const label = e.target.nextElementSibling;
-            label.innerHTML = `<i class="fas fa-file"></i> ${fileName}`;
-        }
-    });
-
-    // Submit assignment functionality
-    assignmentsGrid.addEventListener('click', function(e) {
-        if (e.target.classList.contains('submit-btn')) {
-            const assignmentId = e.target.getAttribute('data-assignment-id');
-            const fileInput = document.getElementById(`file-${assignmentId}`);
-            if (fileInput.files.length === 0) {
-                showNotification('Please select a file to upload.', 'error');
-                return;
-            }
-            submitAssignment(assignmentId, fileInput.files[0]);
-        }
-    });
 
     function submitAssignment(assignmentId, file) {
         const formData = new FormData();
@@ -144,24 +138,24 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             body: formData
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                showNotification('Assignment submitted successfully!', 'success');
-                updateAssignmentStatus(assignmentId, 'Submitted');
-            } else {
-                showNotification(data.message || 'Error submitting assignment.', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showNotification('An error occurred while submitting the assignment.', 'error');
-        });
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    showNotification('Assignment submitted successfully!', 'success');
+                    updateAssignmentStatus(assignmentId, 'Submitted');
+                } else {
+                    showNotification(data.message || 'Error submitting assignment.', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('An error occurred while submitting the assignment.', 'error');
+            });
     }
 
     function updateAssignmentStatus(assignmentId, newStatus) {
@@ -179,6 +173,60 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
     }
+
+    // Assignment card functionality
+function setupAssignmentCards() {
+    if (assignmentCards.length > 0) {
+        assignmentCards.forEach(card => {
+            card.addEventListener('mouseenter', function () {
+                this.style.transform = 'scale(1.05)';
+                this.style.boxShadow = '0 10px 20px rgba(0, 0, 0, 0.2)';
+            });
+            card.addEventListener('mouseleave', function () {
+                this.style.transform = 'scale(1)';
+                this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+            });
+
+            // View Details functionality
+            card.querySelector('.toggle-details').addEventListener('click', function () {
+                const assignmentId = this.closest('.assignment-card').dataset.assignmentId;
+                fetchAssignmentDetails(assignmentId);
+            });
+        });
+
+        // Submit Assignment functionality
+        document.querySelectorAll('.submit-form').forEach(form => {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const assignmentId = this.querySelector('.submit-btn').dataset.assignmentId;
+                const fileInput = this.querySelector('.file-input');
+
+                if (!fileInput || fileInput.files.length === 0) {
+                    showNotification('Please select a file to upload.', 'error');
+                    return;
+                }
+
+                const formData = new FormData(this);
+                formData.append('assignment_id', assignmentId);
+
+                submitAssignment(formData);
+            });
+        });
+
+        // File input change event
+        document.querySelectorAll('.file-input').forEach(input => {
+            input.addEventListener('change', function (e) {
+                const fileName = e.target.files[0].name;
+                const assignmentId = this.dataset.assignmentId;
+                const label = document.querySelector(`label[for="file-${assignmentId}"]`);
+                if (label) {
+                    label.innerHTML = `<i class="fas fa-file"></i> ${fileName}`;
+                    label.classList.add('file-selected');
+                }
+            });
+        });
+    }
+}
 
     function showNotification(message, type) {
         const notification = document.createElement('div');

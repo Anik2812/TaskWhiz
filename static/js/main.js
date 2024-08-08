@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const assignmentsContainer = document.querySelector('.assignments-container');
 
     if (assignmentsContainer) {
-        assignmentsContainer.addEventListener('click', function(event) {
+        assignmentsContainer.addEventListener('click', function (event) {
             const toggleButton = event.target.closest('.toggle-details');
             if (toggleButton) {
                 const card = toggleButton.closest('.assignment-card');
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // Toggle visibility with smooth transition
                 details.classList.toggle('hidden');
-                
+
                 // Update icon
                 const icon = toggleButton.querySelector('i');
                 icon.classList.toggle('fa-chevron-down');
@@ -124,12 +124,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     this.style.transform = 'scale(1)';
                     this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
                 });
-            });
 
-            // View Details functionality
-            document.querySelectorAll('.view-details').forEach(button => {
-                button.addEventListener('click', function () {
-                    const assignmentId = this.getAttribute('data-assignment-id');
+                // View Details functionality
+                card.querySelector('.toggle-details').addEventListener('click', function () {
+                    const assignmentId = this.closest('.assignment-card').dataset.assignmentId;
                     fetchAssignmentDetails(assignmentId);
                 });
             });
@@ -138,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.submit-form').forEach(form => {
                 form.addEventListener('submit', function (e) {
                     e.preventDefault();
-                    const assignmentId = this.querySelector('.submit-btn').getAttribute('data-assignment-id');
+                    const assignmentId = this.querySelector('.submit-btn').dataset.assignmentId;
                     const fileInput = this.querySelector('.file-input');
 
                     if (!fileInput || fileInput.files.length === 0) {
@@ -199,18 +197,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const detailsHtml = `
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>${assignment.title}</h2>
-                <p><strong>Course:</strong> ${assignment.course}</p>
-                <p><strong>Due Date:</strong> ${formatDate(assignment.due_date)}</p>
-                <p><strong>Status:</strong> ${assignment.status}</p>
-                <p><strong>Description:</strong> ${assignment.description}</p>
-                ${assignment.file_url ? `<p><strong>Attached File:</strong> <a href="${assignment.file_url}" target="_blank">View File</a></p>` : ''}
-                ${assignment.status === 'Graded' ? `<p><strong>Grade:</strong> ${assignment.grade} / ${assignment.total_marks}</p>` : ''}
-                ${assignment.feedback ? `<p><strong>Feedback:</strong> ${assignment.feedback}</p>` : ''}
-            </div>
-        `;
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>${assignment.title}</h2>
+            <p><strong>Course:</strong> ${assignment.course}</p>
+            <p><strong>Due Date:</strong> ${formatDate(assignment.due_date)}</p>
+            <p><strong>Status:</strong> ${assignment.status}</p>
+            <p><strong>Description:</strong> ${assignment.description || 'No description available'}</p>
+            ${assignment.file_url ? `<p><strong>Attached File:</strong> <a href="${assignment.file_url}" target="_blank">View File</a></p>` : ''}
+            ${assignment.status === 'Graded' ? `<p><strong>Grade:</strong> ${assignment.grade} / ${assignment.total_marks}</p>` : ''}
+            ${assignment.feedback ? `<p><strong>Feedback:</strong> ${assignment.feedback}</p>` : ''}
+        </div>
+    `;
 
         modal.innerHTML = detailsHtml;
         modal.style.display = 'block';
